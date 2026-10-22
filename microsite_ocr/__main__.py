@@ -14,6 +14,7 @@ from .cli import EXIT_NO_TICKETS, configure_logging, ticket_argument_parser, tic
 from .config import Settings
 from .dms_client import DmsClient
 from .documents import DocumentType
+from .face_client import FaceClient
 from .ocr_client import OcrClient
 from .pipeline import TicketOcrPipeline, TicketResult
 from .store import OcrStore
@@ -52,6 +53,7 @@ def main() -> int:
         ocr=OcrClient.from_settings(settings),
         max_workers=settings.max_workers,
         store=OcrStore.from_settings(settings),
+        face=FaceClient.from_settings(settings),
     ) as pipeline:
         results = pipeline.run(ticket_ids, doc_types=[DocumentType(args.type)] if args.type else None)
 

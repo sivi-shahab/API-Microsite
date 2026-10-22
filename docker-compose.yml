@@ -19,7 +19,12 @@ services:
       MAX_WORKERS: ${MAX_WORKERS:-4}
       SERVICE_API_KEY: ${SERVICE_API_KEY:-}
       DATABASE_URL: postgresql://microsite:${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD di .env}@db:5432/microsite_ocr
+      # Face Verification Service (CompreFace) di host ini; FACE_API_KEY kosong = similarity tidak dihitung.
+      FACE_BASE_URL: ${FACE_BASE_URL:-http://host.docker.internal:8000}
+      FACE_API_KEY: ${FACE_API_KEY:-}
       TZ: ${TZ:-Asia/Jakarta}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       db:
         condition: service_healthy

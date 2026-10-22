@@ -1,11 +1,12 @@
 import logging
 from collections.abc import Collection
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 
 from .dms_client import DmsClient
 from .documents import DmsDocument, DocumentType
+from .face_client import FaceClient
 from .ocr_client import OcrClient
 from .quality import QualityWarning, check_quality
 from .store import OcrStore, StoredDocument
@@ -49,18 +50,27 @@ OcrJob = tuple[TicketResult, DmsDocument]
 
 
 class TicketOcrPipeline:
-    """Tiket → search DMS → download KTP/NPWP → OCR → (opsional) simpan ke database.
+    """Tiket → search DMS → download KTP/NPWP → OCR → (opsional) face matching → simpan ke database.
 
     Thread pool OCR dipakai bersama oleh semua pemanggil `run`, jadi di service HTTP
     jumlah request OCR serentak tetap dibatasi `max_workers` walau ada banyak request masuk.
     Bila `store` diisi, SELFIE ikut di-download (tanpa OCR) setiap kali KTP diminta,
-    supaya pasangan KTP–SELFIE tersedia untuk face matching.
+    supaya pasangan KTP–SELFIE tersedia untuk face matching. Similarity hanya disimpan ke
+    database, jadi `face` tidak dipakai tanpa `store`.
     """
 
-    def __init__(self, dms: DmsClient, ocr: OcrClient, max_workers: int, store: OcrStore | None = None):
+    def __init__(
+        self,
+        dms: DmsClient,
+        ocr: OcrClient,
+        max_workers: int,
+        store: OcrStore | None = None,
+        face: FaceClient | None = None,
+    ):
         self._dms = dms
         self._ocr = ocr
         self._store = store
+        self._face = face if store else None
         self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="ocr")
 
     def close(self) -> None:
@@ -93,8 +103,46 @@ class TicketOcrPipeline:
             stored.append(StoredDocument(document, content, document_result))
         stored += [StoredDocument(document, content, None) for document, content in zip(selfies, selfie_contents)]
 
-        self._save(hit_at, stored)
+        self._save(hit_at, self._with_face_similarity(stored))
         return results
+
+    def _with_face_similarity(self, stored: list[StoredDocument]) -> list[StoredDocument]:
+        """Isi similarity yang sama ke semua KTP dan SELFIE satu nomor dokumen.
+
+        Bila tiket punya lebih dari satu KTP atau SELFIE, setiap pasangan dibandingkan dan
+        yang dipakai skor tertinggi. Skor None bila tidak ada pasangan atau semua verify gagal.
+        """
+        if not self._face:
+            return stored
+
+        pairs = []
+        for ticket_id in dict.fromkeys(item.document.ticket_id for item in stored):
+            ktps, selfies = (
+                [item.content for item in stored
+                 if item.document.ticket_id == ticket_id and item.document.type is doc_type and item.content]
+                for doc_type in (DocumentType.KTP, DocumentType.SELFIE)
+            )
+            pairs += [(ticket_id, selfie, ktp) for selfie in selfies for ktp in ktps]
+
+        scores: dict[str, float] = {}
+        for (ticket_id, _, _), score in zip(pairs, self._executor.map(lambda pair: self._verify_face(*pair), pairs)):
+            if score is not None:
+                scores[ticket_id] = max(score, scores.get(ticket_id, score))
+
+        return [
+            replace(item, face_similarity=scores.get(item.document.ticket_id))
+            if item.document.type in (DocumentType.KTP, DocumentType.SELFIE) else item
+            for item in stored
+        ]
+
+    def _verify_face(self, ticket_id: str, selfie: bytes, ktp: bytes) -> float | None:
+        try:
+            score = self._face.verify(source=selfie, target=ktp)
+        except Exception as exc:
+            logger.error("Tiket %s: face verify gagal: %s", ticket_id, exc)
+            return None
+        logger.info("Tiket %s: face similarity %.4f", ticket_id, score)
+        return score
 
     def _save(self, hit_at: datetime, stored: list[StoredDocument]) -> None:
         """Gagal simpan hanya dicatat di log; hasil OCR tetap dikembalikan."""

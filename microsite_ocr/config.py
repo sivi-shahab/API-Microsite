@@ -18,6 +18,10 @@ class Settings:
     max_tickets_per_request: int = 50
     # PostgreSQL untuk menyimpan setiap dokumen yang diproses. Kosong = tidak disimpan.
     database_url: str = ""
+    # Face Verification Service (CompreFace) untuk similarity KTP vs SELFIE. API key kosong = tidak dihitung.
+    face_base_url: str = "http://localhost:8000"
+    face_api_key: str = ""
+    face_timeout_seconds: float = 30.0
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -33,4 +37,7 @@ class Settings:
             api_key=os.getenv("SERVICE_API_KEY", defaults.api_key),
             max_tickets_per_request=int(os.getenv("MAX_TICKETS_PER_REQUEST", defaults.max_tickets_per_request)),
             database_url=os.getenv("DATABASE_URL", defaults.database_url),
+            face_base_url=os.getenv("FACE_BASE_URL", defaults.face_base_url).rstrip("/"),
+            face_api_key=os.getenv("FACE_API_KEY", defaults.face_api_key),
+            face_timeout_seconds=float(os.getenv("FACE_TIMEOUT", defaults.face_timeout_seconds)),
         )

@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field, StringConstraints
 from .cli import LOG_FORMAT
 from .config import Settings
 from .dms_client import DmsClient
+from .face_client import FaceClient
 from .documents import DocumentType
 from .ocr_client import OcrClient
 from .openapi_examples import (
@@ -69,13 +70,18 @@ def create_app(settings: Settings) -> FastAPI:
             logger.warning("SERVICE_API_KEY kosong: service berjalan tanpa autentikasi")
         if not store:
             logger.warning("DATABASE_URL kosong: hasil tidak disimpan ke database")
-        with TicketOcrPipeline(dms=dms, ocr=ocr, max_workers=settings.max_workers, store=store) as pipeline:
+        elif not face:
+            logger.warning("FACE_API_KEY kosong: face similarity tidak dihitung")
+        with TicketOcrPipeline(
+            dms=dms, ocr=ocr, max_workers=settings.max_workers, store=store, face=face
+        ) as pipeline:
             app.state.pipeline = pipeline
             yield
 
     dms = DmsClient.from_settings(settings)
     ocr = OcrClient.from_settings(settings)
     store = OcrStore.from_settings(settings)
+    face = FaceClient.from_settings(settings)
 
     app = FastAPI(
         title="Microsite OCR Service",

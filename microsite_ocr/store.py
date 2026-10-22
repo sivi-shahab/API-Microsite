@@ -20,8 +20,9 @@ logger = logging.getLogger(__name__)
 DMS_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 _INSERT = """
-    INSERT INTO ocr_document (hit_at, nomor_dokumen, create_date, file_type, node_id, file_base64, ocr_result)
-    VALUES (%s, %s, %s, %s, %s, %s, %s)
+    INSERT INTO ocr_document
+        (hit_at, nomor_dokumen, create_date, file_type, node_id, file_base64, ocr_result, face_similarity)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
 """
 
 
@@ -32,6 +33,8 @@ class StoredDocument:
     content: bytes | None
     # Hasil OCR (`DocumentResult`); None untuk SELFIE.
     ocr_result: "DocumentResult | None"
+    # Similarity KTP vs SELFIE nomor dokumen ini; selalu None untuk NPWP.
+    face_similarity: float | None = None
 
 
 class OcrStore:
@@ -62,6 +65,7 @@ def _to_row(hit_at: datetime, stored: StoredDocument) -> tuple:
         document.node_id,
         base64.b64encode(stored.content).decode("ascii") if stored.content is not None else None,
         Jsonb(asdict(stored.ocr_result)) if stored.ocr_result is not None else None,
+        stored.face_similarity,
     )
 
 
