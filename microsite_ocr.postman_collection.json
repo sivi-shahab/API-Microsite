@@ -1,0 +1,1429 @@
+{
+  "info": {
+    "name": "Microsite OCR Service",
+    "description": "OCR KTP/NPWP dari DMS-Cardsys berdasarkan nomor tiket. Isi variabel collection `base_url` dan `api_key` dulu. Contoh response: NIK dan data pribadi disamarkan, contoh NPWP masih ilustrasi. Dibuat oleh `python -m microsite_ocr.postman`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "X-API-Key",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "{{api_key}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8090"
+    },
+    {
+      "key": "api_key",
+      "value": ""
+    },
+    {
+      "key": "ticket_id",
+      "value": "081156CqJu"
+    }
+  ],
+  "item": [
+    {
+      "name": "System",
+      "description": "",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Status DMS dan OCR API. Tidak butuh API key.\n\nContoh response (200 Semua siap):\n\n```json\n{\n  \"status\": \"ok\",\n  \"dms_reachable\": true,\n  \"ocr_ready\": true\n}\n```"
+          },
+          "response": [
+            {
+              "name": "200 Semua siap",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/health",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "health"
+                  ]
+                },
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": \"ok\",\n  \"dms_reachable\": true,\n  \"ocr_ready\": true\n}"
+            },
+            {
+              "name": "200 OCR API tidak siap",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/health",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "health"
+                  ]
+                },
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": \"degraded\",\n  \"dms_reachable\": true,\n  \"ocr_ready\": false\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Satu tiket",
+      "description": "Nomor tiket diambil dari variabel `ticket_id`.",
+      "item": [
+        {
+          "name": "OCR KTP + NPWP",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "{{ticket_id}}",
+                "ocr"
+              ]
+            },
+            "description": "OCR semua KTP/NPWP dalam satu tiket.\n\nContoh response (200 KTP berhasil di-OCR):\n\n```json\n{\n  \"ticket_id\": \"081156CqJu\",\n  \"data\": [\n    {\n      \"node_id\": \"71698764-05ff-45f5-9301-537faec89d96\",\n      \"filename\": \"KTP_3172XXXXXXXX0012\",\n      \"document_type\": \"ktp\",\n      \"created_at\": \"2026-10-21 11:07:53\",\n      \"data\": {\n        \"NIK\": \"3172XXXXXXXX0012\",\n        \"NAMA\": \"NAMA NASABAH\",\n        \"TTL\": \"KOTA, 01-01-1981\",\n        \"JENIS_KELAMIN\": \"PEREMPUAN\",\n        \"GOL_DARAH\": \"O\",\n        \"ALAMAT\": \"JL. CONTOH NO.15\",\n        \"RT_RW\": \"005/006\",\n        \"KEL_DESA\": \"KEBON PALA\",\n        \"KECAMATAN\": \"MAKASAR\",\n        \"AGAMA\": \"KRISTEN\",\n        \"STATUS_PERKAWINAN\": \"KAWIN\",\n        \"PEKERJAAN\": \"KARYAWAN SWASTA\",\n        \"KEWARGANEGARAAN\": \"WNI\",\n        \"BERLAKU_HINGGA\": \"SEUMUR HIDUP\"\n      },\n      \"warnings\": [],\n      \"error\": null\n    }\n  ],\n  \"skipped\": [\n    \"selfie: d70e1b19-a316-4e08-9b36-1d9c127e18ae\"\n  ],\n  \"error\": null\n}\n```"
+          },
+          "response": [
+            {
+              "name": "200 KTP berhasil di-OCR",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "{{ticket_id}}",
+                    "ocr"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"ticket_id\": \"081156CqJu\",\n  \"data\": [\n    {\n      \"node_id\": \"71698764-05ff-45f5-9301-537faec89d96\",\n      \"filename\": \"KTP_3172XXXXXXXX0012\",\n      \"document_type\": \"ktp\",\n      \"created_at\": \"2026-10-21 11:07:53\",\n      \"data\": {\n        \"NIK\": \"3172XXXXXXXX0012\",\n        \"NAMA\": \"NAMA NASABAH\",\n        \"TTL\": \"KOTA, 01-01-1981\",\n        \"JENIS_KELAMIN\": \"PEREMPUAN\",\n        \"GOL_DARAH\": \"O\",\n        \"ALAMAT\": \"JL. CONTOH NO.15\",\n        \"RT_RW\": \"005/006\",\n        \"KEL_DESA\": \"KEBON PALA\",\n        \"KECAMATAN\": \"MAKASAR\",\n        \"AGAMA\": \"KRISTEN\",\n        \"STATUS_PERKAWINAN\": \"KAWIN\",\n        \"PEKERJAAN\": \"KARYAWAN SWASTA\",\n        \"KEWARGANEGARAAN\": \"WNI\",\n        \"BERLAKU_HINGGA\": \"SEUMUR HIDUP\"\n      },\n      \"warnings\": [],\n      \"error\": null\n    }\n  ],\n  \"skipped\": [\n    \"selfie: d70e1b19-a316-4e08-9b36-1d9c127e18ae\"\n  ],\n  \"error\": null\n}"
+            },
+            {
+              "name": "200 Foto buram: ada warnings",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "{{ticket_id}}",
+                    "ocr"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"ticket_id\": \"020803XGC9\",\n  \"data\": [\n    {\n      \"node_id\": \"999818fc-308c-402e-8ac6-d605fd1d0e51\",\n      \"filename\": \"020803XGC9_KTP_3578XXXXXXXX0002\",\n      \"document_type\": \"ktp\",\n      \"created_at\": \"2026-10-21 10:47:42\",\n      \"data\": {\n        \"NIK\": \"1578XXXXXXXX0002\",\n        \"NAMA\": \"\",\n        \"TTL\": \"KOTA, 27-03-1999\",\n        \"JENIS_KELAMIN\": \"LAKI-LAKI\",\n        \"GOL_DARAH\": \"\",\n        \"ALAMAT\": \"\",\n        \"RT_RW\": \"000/000\",\n        \"KEL_DESA\": \"\",\n        \"KECAMATAN\": \"\",\n        \"AGAMA\": \"\",\n        \"STATUS_PERKAWINAN\": \"\",\n        \"PEKERJAAN\": \"\",\n        \"KEWARGANEGARAAN\": \"\",\n        \"BERLAKU_HINGGA\": \"SEUMUR HIDUP\"\n      },\n      \"warnings\": [\n        {\n          \"code\": \"required_field_empty\",\n          \"message\": \"Field wajib kosong: NAMA, ALAMAT\"\n        },\n        {\n          \"code\": \"mostly_empty\",\n          \"message\": \"9 dari 14 field kosong; kemungkinan foto buram atau terpotong\"\n        },\n        {\n          \"code\": \"nik_mismatch\",\n          \"message\": \"NIK hasil OCR berbeda dari NIK di nama file (beda di digit ke-1, 10, 11)\"\n        }\n      ],\n      \"error\": null\n    }\n  ],\n  \"skipped\": [],\n  \"error\": null\n}"
+            },
+            {
+              "name": "200 OCR dokumen gagal (ditandai di data[].error)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "{{ticket_id}}",
+                    "ocr"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"ticket_id\": \"081156CqJu\",\n  \"data\": [\n    {\n      \"node_id\": \"71698764-05ff-45f5-9301-537faec89d96\",\n      \"filename\": \"KTP_3172XXXXXXXX0012\",\n      \"document_type\": \"ktp\",\n      \"created_at\": \"2026-10-21 11:07:53\",\n      \"data\": null,\n      \"warnings\": [],\n      \"error\": \"OCR ktp gagal: HTTP 500 ...\"\n    }\n  ],\n  \"skipped\": [\n    \"selfie: d70e1b19-a316-4e08-9b36-1d9c127e18ae\"\n  ],\n  \"error\": null\n}"
+            },
+            {
+              "name": "200 Tiket tidak ditemukan",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "{{ticket_id}}",
+                    "ocr"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"ticket_id\": \"TIDAKADA01\",\n  \"data\": [],\n  \"skipped\": [],\n  \"error\": null\n}"
+            },
+            {
+              "name": "401 `X-API-Key` tidak dikirim atau salah",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "{{ticket_id}}",
+                    "ocr"
+                  ]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"X-API-Key tidak valid\"\n}"
+            },
+            {
+              "name": "422 Nomor tiket tidak sesuai pola",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "{{ticket_id}}",
+                    "ocr"
+                  ]
+                }
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": [\n    {\n      \"type\": \"string_pattern_mismatch\",\n      \"loc\": [\n        \"path\",\n        \"ticket_id\"\n      ],\n      \"msg\": \"String should match pattern '^[A-Za-z0-9_-]{1,64}$'\",\n      \"input\": \"tiket!\",\n      \"ctx\": {\n        \"pattern\": \"^[A-Za-z0-9_-]{1,64}$\"\n      }\n    }\n  ]\n}"
+            },
+            {
+              "name": "502 Search ke DMS gagal",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "{{ticket_id}}",
+                    "ocr"
+                  ]
+                }
+              },
+              "status": "Bad Gateway",
+              "code": 502,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Search DMS gagal: <pesan error>\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "OCR KTP saja",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr/ktp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "{{ticket_id}}",
+                "ocr",
+                "ktp"
+              ]
+            },
+            "description": "Hanya dokumen jenis ini yang di-download dan di-OCR; jenis lain dicatat di `skipped`.\n\nContoh response (200 /ocr/ktp: KTP berhasil di-OCR):\n\n```json\n{\n  \"ticket_id\": \"081156CqJu\",\n  \"data\": [\n    {\n      \"node_id\": \"71698764-05ff-45f5-9301-537faec89d96\",\n      \"filename\": \"KTP_3172XXXXXXXX0012\",\n      \"document_type\": \"ktp\",\n      \"created_at\": \"2026-10-21 11:07:53\",\n      \"data\": {\n        \"NIK\": \"3172XXXXXXXX0012\",\n        \"NAMA\": \"NAMA NASABAH\",\n        \"TTL\": \"KOTA, 01-01-1981\",\n        \"JENIS_KELAMIN\": \"PEREMPUAN\",\n        \"GOL_DARAH\": \"O\",\n        \"ALAMAT\": \"JL. CONTOH NO.15\",\n        \"RT_RW\": \"005/006\",\n        \"KEL_DESA\": \"KEBON PALA\",\n        \"KECAMATAN\": \"MAKASAR\",\n        \"AGAMA\": \"KRISTEN\",\n        \"STATUS_PERKAWINAN\": \"KAWIN\",\n        \"PEKERJAAN\": \"KARYAWAN SWASTA\",\n        \"KEWARGANEGARAAN\": \"WNI\",\n        \"BERLAKU_HINGGA\": \"SEUMUR HIDUP\"\n      },\n      \"warnings\": [],\n      \"error\": null\n    }\n  ],\n  \"skipped\": [\n    \"selfie: d70e1b19-a316-4e08-9b36-1d9c127e18ae\"\n  ],\n  \"error\": null\n}\n```"
+          },
+          "response": [
+            {
+              "name": "200 /ocr/ktp: KTP berhasil di-OCR",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr/ktp",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "{{ticket_id}}",
+                    "ocr",
+                    "ktp"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"ticket_id\": \"081156CqJu\",\n  \"data\": [\n    {\n      \"node_id\": \"71698764-05ff-45f5-9301-537faec89d96\",\n      \"filename\": \"KTP_3172XXXXXXXX0012\",\n      \"document_type\": \"ktp\",\n      \"created_at\": \"2026-10-21 11:07:53\",\n      \"data\": {\n        \"NIK\": \"3172XXXXXXXX0012\",\n        \"NAMA\": \"NAMA NASABAH\",\n        \"TTL\": \"KOTA, 01-01-1981\",\n        \"JENIS_KELAMIN\": \"PEREMPUAN\",\n        \"GOL_DARAH\": \"O\",\n        \"ALAMAT\": \"JL. CONTOH NO.15\",\n        \"RT_RW\": \"005/006\",\n        \"KEL_DESA\": \"KEBON PALA\",\n        \"KECAMATAN\": \"MAKASAR\",\n        \"AGAMA\": \"KRISTEN\",\n        \"STATUS_PERKAWINAN\": \"KAWIN\",\n        \"PEKERJAAN\": \"KARYAWAN SWASTA\",\n        \"KEWARGANEGARAAN\": \"WNI\",\n        \"BERLAKU_HINGGA\": \"SEUMUR HIDUP\"\n      },\n      \"warnings\": [],\n      \"error\": null\n    }\n  ],\n  \"skipped\": [\n    \"selfie: d70e1b19-a316-4e08-9b36-1d9c127e18ae\"\n  ],\n  \"error\": null\n}"
+            },
+            {
+              "name": "401 `X-API-Key` tidak dikirim atau salah",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr/ktp",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "{{ticket_id}}",
+                    "ocr",
+                    "ktp"
+                  ]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"X-API-Key tidak valid\"\n}"
+            },
+            {
+              "name": "422 Nomor tiket tidak sesuai pola",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr/ktp",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "{{ticket_id}}",
+                    "ocr",
+                    "ktp"
+                  ]
+                }
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": [\n    {\n      \"type\": \"string_pattern_mismatch\",\n      \"loc\": [\n        \"path\",\n        \"ticket_id\"\n      ],\n      \"msg\": \"String should match pattern '^[A-Za-z0-9_-]{1,64}$'\",\n      \"input\": \"tiket!\",\n      \"ctx\": {\n        \"pattern\": \"^[A-Za-z0-9_-]{1,64}$\"\n      }\n    }\n  ]\n}"
+            },
+            {
+              "name": "502 Search ke DMS gagal",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr/ktp",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "{{ticket_id}}",
+                    "ocr",
+                    "ktp"
+                  ]
+                }
+              },
+              "status": "Bad Gateway",
+              "code": 502,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Search DMS gagal: <pesan error>\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "OCR NPWP saja",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr/npwp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "{{ticket_id}}",
+                "ocr",
+                "npwp"
+              ]
+            },
+            "description": "Hanya dokumen jenis ini yang di-download dan di-OCR; jenis lain dicatat di `skipped`.\n\nContoh response (200 /ocr/npwp: tiket tanpa NPWP, KTP masuk skipped):\n\n```json\n{\n  \"ticket_id\": \"081156CqJu\",\n  \"data\": [],\n  \"skipped\": [\n    \"selfie: d70e1b19-a316-4e08-9b36-1d9c127e18ae\",\n    \"ktp: 71698764-05ff-45f5-9301-537faec89d96\"\n  ],\n  \"error\": null\n}\n```"
+          },
+          "response": [
+            {
+              "name": "200 /ocr/npwp: tiket tanpa NPWP, KTP masuk skipped",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr/npwp",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "{{ticket_id}}",
+                    "ocr",
+                    "npwp"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"ticket_id\": \"081156CqJu\",\n  \"data\": [],\n  \"skipped\": [\n    \"selfie: d70e1b19-a316-4e08-9b36-1d9c127e18ae\",\n    \"ktp: 71698764-05ff-45f5-9301-537faec89d96\"\n  ],\n  \"error\": null\n}"
+            },
+            {
+              "name": "200 /ocr/npwp: NPWP berhasil di-OCR (ilustrasi)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr/npwp",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "{{ticket_id}}",
+                    "ocr",
+                    "npwp"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"ticket_id\": \"<tiket>\",\n  \"data\": [\n    {\n      \"node_id\": \"<nodeId>\",\n      \"filename\": \"NPWP_<...>\",\n      \"document_type\": \"npwp\",\n      \"created_at\": \"2026-10-21 11:07:53\",\n      \"data\": {\n        \"NPWP\": \"XX.XXX.XXX.X-XXX.XXX\",\n        \"NAMA\": \"NAMA NASABAH\",\n        \"NIK\": \"3172XXXXXXXX0012\",\n        \"ALAMAT\": \"JL. CONTOH NO.15\",\n        \"KPP\": \"KPP PRATAMA ...\",\n        \"TANGGAL_TERDAFTAR\": \"01-01-2015\"\n      },\n      \"warnings\": [],\n      \"error\": null\n    }\n  ],\n  \"skipped\": [],\n  \"error\": null\n}"
+            },
+            {
+              "name": "401 `X-API-Key` tidak dikirim atau salah",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr/npwp",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "{{ticket_id}}",
+                    "ocr",
+                    "npwp"
+                  ]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"X-API-Key tidak valid\"\n}"
+            },
+            {
+              "name": "422 Nomor tiket tidak sesuai pola",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr/npwp",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "{{ticket_id}}",
+                    "ocr",
+                    "npwp"
+                  ]
+                }
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": [\n    {\n      \"type\": \"string_pattern_mismatch\",\n      \"loc\": [\n        \"path\",\n        \"ticket_id\"\n      ],\n      \"msg\": \"String should match pattern '^[A-Za-z0-9_-]{1,64}$'\",\n      \"input\": \"tiket!\",\n      \"ctx\": {\n        \"pattern\": \"^[A-Za-z0-9_-]{1,64}$\"\n      }\n    }\n  ]\n}"
+            },
+            {
+              "name": "502 Search ke DMS gagal",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr/npwp",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "{{ticket_id}}",
+                    "ocr",
+                    "npwp"
+                  ]
+                }
+              },
+              "status": "Bad Gateway",
+              "code": 502,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Search DMS gagal: <pesan error>\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Beberapa tiket",
+      "description": "Body `{\"ticket_ids\": [...]}`, maksimal `MAX_TICKETS_PER_REQUEST`.",
+      "item": [
+        {
+          "name": "OCR KTP + NPWP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tickets/ocr",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "ocr"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ticket_ids\": [\n    \"081156CqJu\",\n    \"020803XGC9\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "OCR beberapa tiket. Hasil berurutan sesuai input, tanpa duplikat; kegagalan per tiket ditandai di `error`.\n\nContoh response (200 Dua tiket, satu ada warnings):\n\n```json\n[\n  {\n    \"ticket_id\": \"081156CqJu\",\n    \"data\": [\n      {\n        \"node_id\": \"71698764-05ff-45f5-9301-537faec89d96\",\n        \"filename\": \"KTP_3172XXXXXXXX0012\",\n        \"document_type\": \"ktp\",\n        \"created_at\": \"2026-10-21 11:07:53\",\n        \"data\": {\n          \"NIK\": \"3172XXXXXXXX0012\",\n          \"NAMA\": \"NAMA NASABAH\",\n          \"TTL\": \"KOTA, 01-01-1981\",\n          \"JENIS_KELAMIN\": \"PEREMPUAN\",\n          \"GOL_DARAH\": \"O\",\n          \"ALAMAT\": \"JL. CONTOH NO.15\",\n          \"RT_RW\": \"005/006\",\n          \"KEL_DESA\": \"KEBON PALA\",\n          \"KECAMATAN\": \"MAKASAR\",\n          \"AGAMA\": \"KRISTEN\",\n          \"STATUS_PERKAWINAN\": \"KAWIN\",\n          \"PEKERJAAN\": \"KARYAWAN SWASTA\",\n          \"KEWARGANEGARAAN\": \"WNI\",\n          \"BERLAKU_HINGGA\": \"SEUMUR HIDUP\"\n        },\n        \"warnings\": [],\n        \"error\": null\n      }\n    ],\n    \"skipped\": [\n      \"selfie: d70e1b19-a316-4e08-9b36-1d9c127e18ae\"\n    ],\n    \"error\": null\n  },\n  {\n    \"ticket_id\": \"020803XGC9\",\n    \"data\": [\n      {\n        \"node_id\": \"999818fc-308c-402e-8ac6-d605fd1d0e51\",\n        \"filename\": \"020803XGC9_KTP_3578XXXXXXXX0002\",\n        \"document_type\": \"ktp\",\n        \"created_at\": \"2026-10-21 10:47:42\",\n        \"data\": {\n          \"NIK\": \"1578XXXXXXXX0002\",\n          \"NAMA\": \"\",\n          \"TTL\": \"KOTA, 27-03-1999\",\n          \"JENIS_KELAMIN\": \"LAKI-LAKI\",\n          \"GOL_DARAH\": \"\",\n          \"ALAMAT\": \"\",\n          \"RT_RW\": \"000/000\",\n          \"KEL_DESA\": \"\",\n          \"KECAMATAN\": \"\",\n          \"AGAMA\": \"\",\n          \"STATUS_PERKAWINAN\": \"\",\n          \"PEKERJAAN\": \"\",\n          \"KEWARGANEGARAAN\": \"\",\n          \"BERLAKU_HINGGA\": \"SEUMUR HIDUP\"\n        },\n        \"warnings\": [\n          {\n            \"code\": \"required_field_empty\",\n            \"message\": \"Field wajib kosong: NAMA, ALAMAT\"\n          },\n          {\n            \"code\": \"mostly_empty\",\n            \"message\": \"9 dari 14 field kosong; kemungkinan foto buram atau terpotong\"\n          },\n          {\n            \"code\": \"nik_mismatch\",\n            \"message\": \"NIK hasil OCR berbeda dari NIK di nama file (beda di digit ke-1, 10, 11)\"\n          }\n        ],\n        \"error\": null\n      }\n    ],\n    \"skipped\": [],\n    \"error\": null\n  }\n]\n```"
+          },
+          "response": [
+            {
+              "name": "200 Dua tiket, satu ada warnings",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/tickets/ocr",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "ocr"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ticket_ids\": [\n    \"081156CqJu\",\n    \"020803XGC9\"\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "[\n  {\n    \"ticket_id\": \"081156CqJu\",\n    \"data\": [\n      {\n        \"node_id\": \"71698764-05ff-45f5-9301-537faec89d96\",\n        \"filename\": \"KTP_3172XXXXXXXX0012\",\n        \"document_type\": \"ktp\",\n        \"created_at\": \"2026-10-21 11:07:53\",\n        \"data\": {\n          \"NIK\": \"3172XXXXXXXX0012\",\n          \"NAMA\": \"NAMA NASABAH\",\n          \"TTL\": \"KOTA, 01-01-1981\",\n          \"JENIS_KELAMIN\": \"PEREMPUAN\",\n          \"GOL_DARAH\": \"O\",\n          \"ALAMAT\": \"JL. CONTOH NO.15\",\n          \"RT_RW\": \"005/006\",\n          \"KEL_DESA\": \"KEBON PALA\",\n          \"KECAMATAN\": \"MAKASAR\",\n          \"AGAMA\": \"KRISTEN\",\n          \"STATUS_PERKAWINAN\": \"KAWIN\",\n          \"PEKERJAAN\": \"KARYAWAN SWASTA\",\n          \"KEWARGANEGARAAN\": \"WNI\",\n          \"BERLAKU_HINGGA\": \"SEUMUR HIDUP\"\n        },\n        \"warnings\": [],\n        \"error\": null\n      }\n    ],\n    \"skipped\": [\n      \"selfie: d70e1b19-a316-4e08-9b36-1d9c127e18ae\"\n    ],\n    \"error\": null\n  },\n  {\n    \"ticket_id\": \"020803XGC9\",\n    \"data\": [\n      {\n        \"node_id\": \"999818fc-308c-402e-8ac6-d605fd1d0e51\",\n        \"filename\": \"020803XGC9_KTP_3578XXXXXXXX0002\",\n        \"document_type\": \"ktp\",\n        \"created_at\": \"2026-10-21 10:47:42\",\n        \"data\": {\n          \"NIK\": \"1578XXXXXXXX0002\",\n          \"NAMA\": \"\",\n          \"TTL\": \"KOTA, 27-03-1999\",\n          \"JENIS_KELAMIN\": \"LAKI-LAKI\",\n          \"GOL_DARAH\": \"\",\n          \"ALAMAT\": \"\",\n          \"RT_RW\": \"000/000\",\n          \"KEL_DESA\": \"\",\n          \"KECAMATAN\": \"\",\n          \"AGAMA\": \"\",\n          \"STATUS_PERKAWINAN\": \"\",\n          \"PEKERJAAN\": \"\",\n          \"KEWARGANEGARAAN\": \"\",\n          \"BERLAKU_HINGGA\": \"SEUMUR HIDUP\"\n        },\n        \"warnings\": [\n          {\n            \"code\": \"required_field_empty\",\n            \"message\": \"Field wajib kosong: NAMA, ALAMAT\"\n          },\n          {\n            \"code\": \"mostly_empty\",\n            \"message\": \"9 dari 14 field kosong; kemungkinan foto buram atau terpotong\"\n          },\n          {\n            \"code\": \"nik_mismatch\",\n            \"message\": \"NIK hasil OCR berbeda dari NIK di nama file (beda di digit ke-1, 10, 11)\"\n          }\n        ],\n        \"error\": null\n      }\n    ],\n    \"skipped\": [],\n    \"error\": null\n  }\n]"
+            },
+            {
+              "name": "200 Salah satu tiket tidak ditemukan",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/tickets/ocr",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "ocr"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ticket_ids\": [\n    \"081156CqJu\",\n    \"020803XGC9\"\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "[\n  {\n    \"ticket_id\": \"081156CqJu\",\n    \"data\": [\n      {\n        \"node_id\": \"71698764-05ff-45f5-9301-537faec89d96\",\n        \"filename\": \"KTP_3172XXXXXXXX0012\",\n        \"document_type\": \"ktp\",\n        \"created_at\": \"2026-10-21 11:07:53\",\n        \"data\": {\n          \"NIK\": \"3172XXXXXXXX0012\",\n          \"NAMA\": \"NAMA NASABAH\",\n          \"TTL\": \"KOTA, 01-01-1981\",\n          \"JENIS_KELAMIN\": \"PEREMPUAN\",\n          \"GOL_DARAH\": \"O\",\n          \"ALAMAT\": \"JL. CONTOH NO.15\",\n          \"RT_RW\": \"005/006\",\n          \"KEL_DESA\": \"KEBON PALA\",\n          \"KECAMATAN\": \"MAKASAR\",\n          \"AGAMA\": \"KRISTEN\",\n          \"STATUS_PERKAWINAN\": \"KAWIN\",\n          \"PEKERJAAN\": \"KARYAWAN SWASTA\",\n          \"KEWARGANEGARAAN\": \"WNI\",\n          \"BERLAKU_HINGGA\": \"SEUMUR HIDUP\"\n        },\n        \"warnings\": [],\n        \"error\": null\n      }\n    ],\n    \"skipped\": [\n      \"selfie: d70e1b19-a316-4e08-9b36-1d9c127e18ae\"\n    ],\n    \"error\": null\n  },\n  {\n    \"ticket_id\": \"TIDAKADA01\",\n    \"data\": [],\n    \"skipped\": [],\n    \"error\": null\n  }\n]"
+            },
+            {
+              "name": "200 Search DMS gagal untuk satu tiket (ditandai di error)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/tickets/ocr",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "ocr"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ticket_ids\": [\n    \"081156CqJu\",\n    \"020803XGC9\"\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "[\n  {\n    \"ticket_id\": \"081156CqJu\",\n    \"data\": [\n      {\n        \"node_id\": \"71698764-05ff-45f5-9301-537faec89d96\",\n        \"filename\": \"KTP_3172XXXXXXXX0012\",\n        \"document_type\": \"ktp\",\n        \"created_at\": \"2026-10-21 11:07:53\",\n        \"data\": {\n          \"NIK\": \"3172XXXXXXXX0012\",\n          \"NAMA\": \"NAMA NASABAH\",\n          \"TTL\": \"KOTA, 01-01-1981\",\n          \"JENIS_KELAMIN\": \"PEREMPUAN\",\n          \"GOL_DARAH\": \"O\",\n          \"ALAMAT\": \"JL. CONTOH NO.15\",\n          \"RT_RW\": \"005/006\",\n          \"KEL_DESA\": \"KEBON PALA\",\n          \"KECAMATAN\": \"MAKASAR\",\n          \"AGAMA\": \"KRISTEN\",\n          \"STATUS_PERKAWINAN\": \"KAWIN\",\n          \"PEKERJAAN\": \"KARYAWAN SWASTA\",\n          \"KEWARGANEGARAAN\": \"WNI\",\n          \"BERLAKU_HINGGA\": \"SEUMUR HIDUP\"\n        },\n        \"warnings\": [],\n        \"error\": null\n      }\n    ],\n    \"skipped\": [\n      \"selfie: d70e1b19-a316-4e08-9b36-1d9c127e18ae\"\n    ],\n    \"error\": null\n  },\n  {\n    \"ticket_id\": \"020803XGC9\",\n    \"data\": [],\n    \"skipped\": [],\n    \"error\": \"<pesan error>\"\n  }\n]"
+            },
+            {
+              "name": "401 `X-API-Key` tidak dikirim atau salah",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/tickets/ocr",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "ocr"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ticket_ids\": [\n    \"081156CqJu\",\n    \"020803XGC9\"\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"X-API-Key tidak valid\"\n}"
+            },
+            {
+              "name": "422 Terlalu banyak tiket",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/tickets/ocr",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "ocr"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ticket_ids\": [\n    \"081156CqJu\",\n    \"020803XGC9\"\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Maksimal 50 tiket per request, diterima 51\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "OCR KTP saja",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tickets/ocr/ktp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "ocr",
+                "ktp"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ticket_ids\": [\n    \"081156CqJu\",\n    \"020803XGC9\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Sama dengan `POST /tickets/ocr`, tetapi hanya satu jenis dokumen; jenis lain dicatat di `skipped`.\n\nContoh response (200 /ocr/ktp):\n\n```json\n[\n  {\n    \"ticket_id\": \"081156CqJu\",\n    \"data\": [\n      {\n        \"node_id\": \"71698764-05ff-45f5-9301-537faec89d96\",\n        \"filename\": \"KTP_3172XXXXXXXX0012\",\n        \"document_type\": \"ktp\",\n        \"created_at\": \"2026-10-21 11:07:53\",\n        \"data\": {\n          \"NIK\": \"3172XXXXXXXX0012\",\n          \"NAMA\": \"NAMA NASABAH\",\n          \"TTL\": \"KOTA, 01-01-1981\",\n          \"JENIS_KELAMIN\": \"PEREMPUAN\",\n          \"GOL_DARAH\": \"O\",\n          \"ALAMAT\": \"JL. CONTOH NO.15\",\n          \"RT_RW\": \"005/006\",\n          \"KEL_DESA\": \"KEBON PALA\",\n          \"KECAMATAN\": \"MAKASAR\",\n          \"AGAMA\": \"KRISTEN\",\n          \"STATUS_PERKAWINAN\": \"KAWIN\",\n          \"PEKERJAAN\": \"KARYAWAN SWASTA\",\n          \"KEWARGANEGARAAN\": \"WNI\",\n          \"BERLAKU_HINGGA\": \"SEUMUR HIDUP\"\n        },\n        \"warnings\": [],\n        \"error\": null\n      }\n    ],\n    \"skipped\": [\n      \"selfie: d70e1b19-a316-4e08-9b36-1d9c127e18ae\"\n    ],\n    \"error\": null\n  },\n  {\n    \"ticket_id\": \"TIDAKADA01\",\n    \"data\": [],\n    \"skipped\": [],\n    \"error\": null\n  }\n]\n```"
+          },
+          "response": [
+            {
+              "name": "200 /ocr/ktp",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/tickets/ocr/ktp",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "ocr",
+                    "ktp"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ticket_ids\": [\n    \"081156CqJu\",\n    \"020803XGC9\"\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "[\n  {\n    \"ticket_id\": \"081156CqJu\",\n    \"data\": [\n      {\n        \"node_id\": \"71698764-05ff-45f5-9301-537faec89d96\",\n        \"filename\": \"KTP_3172XXXXXXXX0012\",\n        \"document_type\": \"ktp\",\n        \"created_at\": \"2026-10-21 11:07:53\",\n        \"data\": {\n          \"NIK\": \"3172XXXXXXXX0012\",\n          \"NAMA\": \"NAMA NASABAH\",\n          \"TTL\": \"KOTA, 01-01-1981\",\n          \"JENIS_KELAMIN\": \"PEREMPUAN\",\n          \"GOL_DARAH\": \"O\",\n          \"ALAMAT\": \"JL. CONTOH NO.15\",\n          \"RT_RW\": \"005/006\",\n          \"KEL_DESA\": \"KEBON PALA\",\n          \"KECAMATAN\": \"MAKASAR\",\n          \"AGAMA\": \"KRISTEN\",\n          \"STATUS_PERKAWINAN\": \"KAWIN\",\n          \"PEKERJAAN\": \"KARYAWAN SWASTA\",\n          \"KEWARGANEGARAAN\": \"WNI\",\n          \"BERLAKU_HINGGA\": \"SEUMUR HIDUP\"\n        },\n        \"warnings\": [],\n        \"error\": null\n      }\n    ],\n    \"skipped\": [\n      \"selfie: d70e1b19-a316-4e08-9b36-1d9c127e18ae\"\n    ],\n    \"error\": null\n  },\n  {\n    \"ticket_id\": \"TIDAKADA01\",\n    \"data\": [],\n    \"skipped\": [],\n    \"error\": null\n  }\n]"
+            },
+            {
+              "name": "401 `X-API-Key` tidak dikirim atau salah",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/tickets/ocr/ktp",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "ocr",
+                    "ktp"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ticket_ids\": [\n    \"081156CqJu\",\n    \"020803XGC9\"\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"X-API-Key tidak valid\"\n}"
+            },
+            {
+              "name": "422 Terlalu banyak tiket",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/tickets/ocr/ktp",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "ocr",
+                    "ktp"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ticket_ids\": [\n    \"081156CqJu\",\n    \"020803XGC9\"\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Maksimal 50 tiket per request, diterima 51\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "OCR NPWP saja",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tickets/ocr/npwp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "ocr",
+                "npwp"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ticket_ids\": [\n    \"081156CqJu\",\n    \"020803XGC9\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Sama dengan `POST /tickets/ocr`, tetapi hanya satu jenis dokumen; jenis lain dicatat di `skipped`.\n\nContoh response (200 /ocr/npwp: tiket tanpa NPWP):\n\n```json\n[\n  {\n    \"ticket_id\": \"081156CqJu\",\n    \"data\": [],\n    \"skipped\": [\n      \"selfie: d70e1b19-a316-4e08-9b36-1d9c127e18ae\",\n      \"ktp: 71698764-05ff-45f5-9301-537faec89d96\"\n    ],\n    \"error\": null\n  },\n  {\n    \"ticket_id\": \"020803XGC9\",\n    \"data\": [],\n    \"skipped\": [\n      \"ktp: 999818fc-308c-402e-8ac6-d605fd1d0e51\"\n    ],\n    \"error\": null\n  }\n]\n```"
+          },
+          "response": [
+            {
+              "name": "200 /ocr/npwp: tiket tanpa NPWP",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/tickets/ocr/npwp",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "ocr",
+                    "npwp"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ticket_ids\": [\n    \"081156CqJu\",\n    \"020803XGC9\"\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "[\n  {\n    \"ticket_id\": \"081156CqJu\",\n    \"data\": [],\n    \"skipped\": [\n      \"selfie: d70e1b19-a316-4e08-9b36-1d9c127e18ae\",\n      \"ktp: 71698764-05ff-45f5-9301-537faec89d96\"\n    ],\n    \"error\": null\n  },\n  {\n    \"ticket_id\": \"020803XGC9\",\n    \"data\": [],\n    \"skipped\": [\n      \"ktp: 999818fc-308c-402e-8ac6-d605fd1d0e51\"\n    ],\n    \"error\": null\n  }\n]"
+            },
+            {
+              "name": "200 /ocr/npwp: NPWP berhasil di-OCR (ilustrasi)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/tickets/ocr/npwp",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "ocr",
+                    "npwp"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ticket_ids\": [\n    \"081156CqJu\",\n    \"020803XGC9\"\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "[\n  {\n    \"ticket_id\": \"<tiket>\",\n    \"data\": [\n      {\n        \"node_id\": \"<nodeId>\",\n        \"filename\": \"NPWP_<...>\",\n        \"document_type\": \"npwp\",\n        \"created_at\": \"2026-10-21 11:07:53\",\n        \"data\": {\n          \"NPWP\": \"XX.XXX.XXX.X-XXX.XXX\",\n          \"NAMA\": \"NAMA NASABAH\",\n          \"NIK\": \"3172XXXXXXXX0012\",\n          \"ALAMAT\": \"JL. CONTOH NO.15\",\n          \"KPP\": \"KPP PRATAMA ...\",\n          \"TANGGAL_TERDAFTAR\": \"01-01-2015\"\n        },\n        \"warnings\": [],\n        \"error\": null\n      }\n    ],\n    \"skipped\": [],\n    \"error\": null\n  }\n]"
+            },
+            {
+              "name": "401 `X-API-Key` tidak dikirim atau salah",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/tickets/ocr/npwp",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "ocr",
+                    "npwp"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ticket_ids\": [\n    \"081156CqJu\",\n    \"020803XGC9\"\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"X-API-Key tidak valid\"\n}"
+            },
+            {
+              "name": "422 Terlalu banyak tiket",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/tickets/ocr/npwp",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "ocr",
+                    "npwp"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ticket_ids\": [\n    \"081156CqJu\",\n    \"020803XGC9\"\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Maksimal 50 tiket per request, diterima 51\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Contoh error",
+      "description": "",
+      "item": [
+        {
+          "name": "401 tanpa API key",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr/ktp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "{{ticket_id}}",
+                "ocr",
+                "ktp"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Request tanpa header `X-API-Key`.\n\nContoh response (401 `X-API-Key` tidak dikirim atau salah):\n\n```json\n{\n  \"detail\": \"X-API-Key tidak valid\"\n}\n```"
+          },
+          "response": [
+            {
+              "name": "401 `X-API-Key` tidak dikirim atau salah",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr/ktp",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "{{ticket_id}}",
+                    "ocr",
+                    "ktp"
+                  ]
+                },
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"X-API-Key tidak valid\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "422 jenis dokumen salah",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr/sim",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "{{ticket_id}}",
+                "ocr",
+                "sim"
+              ]
+            },
+            "description": "Jenis dokumen selain `ktp`/`npwp`.\n\nContoh response (422 Jenis dokumen selain ktp/npwp):\n\n```json\n{\n  \"detail\": [\n    {\n      \"type\": \"literal_error\",\n      \"loc\": [\n        \"path\",\n        \"doc_type\"\n      ],\n      \"msg\": \"Input should be 'ktp' or 'npwp'\",\n      \"input\": \"sim\",\n      \"ctx\": {\n        \"expected\": \"'ktp' or 'npwp'\"\n      }\n    }\n  ]\n}\n```"
+          },
+          "response": [
+            {
+              "name": "422 Jenis dokumen selain ktp/npwp",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tickets/{{ticket_id}}/ocr/sim",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "{{ticket_id}}",
+                    "ocr",
+                    "sim"
+                  ]
+                }
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": [\n    {\n      \"type\": \"literal_error\",\n      \"loc\": [\n        \"path\",\n        \"doc_type\"\n      ],\n      \"msg\": \"Input should be 'ktp' or 'npwp'\",\n      \"input\": \"sim\",\n      \"ctx\": {\n        \"expected\": \"'ktp' or 'npwp'\"\n      }\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "422 nomor tiket tidak valid",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tickets/tiket!/ocr",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "tiket!",
+                "ocr"
+              ]
+            },
+            "description": "Nomor tiket harus sesuai pola `[A-Za-z0-9_-]{1,64}`.\n\nContoh response (422 Nomor tiket tidak sesuai pola):\n\n```json\n{\n  \"detail\": [\n    {\n      \"type\": \"string_pattern_mismatch\",\n      \"loc\": [\n        \"path\",\n        \"ticket_id\"\n      ],\n      \"msg\": \"String should match pattern '^[A-Za-z0-9_-]{1,64}$'\",\n      \"input\": \"tiket!\",\n      \"ctx\": {\n        \"pattern\": \"^[A-Za-z0-9_-]{1,64}$\"\n      }\n    }\n  ]\n}\n```"
+          },
+          "response": [
+            {
+              "name": "422 Nomor tiket tidak sesuai pola",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tickets/tiket!/ocr",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tickets",
+                    "tiket!",
+                    "ocr"
+                  ]
+                }
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": [\n    {\n      \"type\": \"string_pattern_mismatch\",\n      \"loc\": [\n        \"path\",\n        \"ticket_id\"\n      ],\n      \"msg\": \"String should match pattern '^[A-Za-z0-9_-]{1,64}$'\",\n      \"input\": \"tiket!\",\n      \"ctx\": {\n        \"pattern\": \"^[A-Za-z0-9_-]{1,64}$\"\n      }\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

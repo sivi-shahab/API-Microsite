@@ -1,0 +1,4 @@
+requests>=2.31
+# Hanya untuk service HTTP (python -m microsite_ocr.service)
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0

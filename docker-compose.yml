@@ -1,0 +1,27 @@
+# Microsite OCR Service.
+#
+#   SERVICE_API_KEY=<kunci> docker compose up -d --build
+#   curl localhost:8090/health
+#
+# OCR API (/data/ocr-qwen) dan DMS diakses lewat IP, jadi service ini tidak perlu
+# satu network compose dengan OCR API.
+
+services:
+  api:
+    build: .
+    image: microsite-ocr:latest
+    restart: unless-stopped
+    ports:
+      - "${SERVICE_PORT:-8090}:8090"
+    environment:
+      DMS_BASE_URL: ${DMS_BASE_URL:-http://10.191.22.16:8688}
+      OCR_BASE_URL: ${OCR_BASE_URL:-http://10.168.105.11:8070}
+      MAX_WORKERS: ${MAX_WORKERS:-4}
+      SERVICE_API_KEY: ${SERVICE_API_KEY:-}
+      TZ: ${TZ:-Asia/Jakarta}
+
+networks:
+  default:
+    driver_opts:
+      # NIC server (enp1s0) MTU 1400; default Docker 1500 membuat download file dari DMS timeout.
+      com.docker.network.driver.mtu: ${DOCKER_MTU:-1400}

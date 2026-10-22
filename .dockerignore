@@ -1,0 +1,5 @@
+# Jangan bawa data nasabah (foto KTP/selfie, hasil OCR) ke image.
+*
+!requirements.txt
+!microsite_ocr/
+microsite_ocr/**/__pycache__

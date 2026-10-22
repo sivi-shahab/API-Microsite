@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Secret / konfigurasi lokal
+.env
+
+# Data nasabah: foto KTP/selfie, hasil OCR, daftar tiket
+downloads/
+KTP_*
+SELFIE_*
+hasil_ocr.json
+tickets.txt
