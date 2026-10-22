@@ -646,15 +646,17 @@ Client DMS dan OCR tidak saling tahu; pipeline yang menyambungkan keduanya. Pipe
 
 Run 21 Oktober 2026 untuk 7 tiket di `tickets.txt` (`DMS_BASE_URL` dan `OCR_BASE_URL` default). CLI dan service (`POST /tickets/ocr`, baik lewat `venv` maupun container Docker) memberi hasil yang sama: exit code 0 / HTTP 200, 8 KTP berhasil di-OCR, 3 SELFIE dilewati, tidak ada NPWP. 3 dari 8 KTP bersih, 5 diberi penanda.
 
-| Tiket | KTP di-OCR | SELFIE dilewati | `warnings` | Catatan |
-|---|---|---|---|---|
-| `081156CqJu` | 1 | 1 | - | Semua field terisi |
-| `020803XGC9` | 1 | 0 | `required_field_empty`, `mostly_empty`, `nik_mismatch` | 9 dari 14 field kosong (NAMA, ALAMAT dll.); NIK beda di digit ke-1, 10, 11. Foto sudah dicek: buram, 731×411 px, teks data tidak terbaca. NIK di nama file (kode 3578 = Kota Surabaya, sesuai kartu) yang benar. |
-| `071247bL4i` | 1 | 1 | `required_field_empty`, `nik_mismatch` | ALAMAT kosong; NIK beda di digit ke-6 |
-| `020313wa3H` | 1 | 1 | - | Semua field terisi |
-| `0102253on9` | 1 | 0 | - | Semua field terisi |
-| `101245vNrq` | 2 | 0 | `filename_nik_invalid` (×2) | Semua field terisi; NIK di nama file hanya 15 digit. Kedua file identik (SHA-256 sama). |
-| `0203106ktH` | 1 | 0 | `nik_mismatch` | Semua field terisi; NIK beda di digit ke-11, 12 |
+Face similarity dihitung 22 Oktober 2026 (backfill + skrip dengan `FaceMatcher` yang sama) untuk 3 tiket yang punya SELFIE di DMS; 4 tiket lain tidak punya SELFIE (`-`). Hasil uji lengkap per KTP ada di `hasil_uji_ocr_ktp.xlsx` (kolom Face Similarity; file tidak masuk git karena berisi data nasabah).
+
+| Tiket | KTP di-OCR | SELFIE dilewati | `warnings` | Face similarity | Catatan |
+|---|---|---|---|---|---|
+| `081156CqJu` | 1 | 1 | - | 0.8887 | Semua field terisi |
+| `020803XGC9` | 1 | 0 | `required_field_empty`, `mostly_empty`, `nik_mismatch` | - | 9 dari 14 field kosong (NAMA, ALAMAT dll.); NIK beda di digit ke-1, 10, 11. Foto sudah dicek: buram, 731×411 px, teks data tidak terbaca. NIK di nama file (kode 3578 = Kota Surabaya, sesuai kartu) yang benar. |
+| `071247bL4i` | 1 | 1 | `required_field_empty`, `nik_mismatch` | 0.5167 | ALAMAT kosong; NIK beda di digit ke-6 |
+| `020313wa3H` | 1 | 1 | - | 0.5636 | Semua field terisi |
+| `0102253on9` | 1 | 0 | - | - | Semua field terisi |
+| `101245vNrq` | 2 | 0 | `filename_nik_invalid` (×2) | - | Semua field terisi; NIK di nama file hanya 15 digit. Kedua file identik (SHA-256 sama). |
+| `0203106ktH` | 1 | 0 | `nik_mismatch` | - | Semua field terisi; NIK beda di digit ke-11, 12 |
 
 Tindak lanjut:
 
