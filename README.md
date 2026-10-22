@@ -22,6 +22,7 @@ Logika yang sama tersedia sebagai CLI (`python3 -m microsite_ocr --file tickets.
   - [Deploy dengan Docker](#deploy-dengan-docker)
 - [Database](#database)
   - [Face similarity](#face-similarity)
+  - [Backfill similarity data lama](#backfill-similarity-data-lama)
 - [Quick start (CLI)](#quick-start-cli)
 - [Alur](#alur)
 - [Konfigurasi](#konfigurasi)
@@ -320,7 +321,7 @@ Container `db` (`postgres:16-alpine`, database `microsite_ocr`, user `microsite`
 | `node_id` | `varchar(64)` | `nodeId` dokumen di DMS |
 | `file_base64` | `text` | Isi file dari DMS, base64; NULL bila download gagal |
 | `ocr_result` | `jsonb` | Satu objek `data[]` dari response (node_id, filename, document_type, created_at, data, warnings, error). **NULL untuk SELFIE.** |
-| `face_similarity` | `numeric(5,4)` | Skor kemiripan wajah KTP vs SELFIE (0–1), lihat [Face similarity](#face-similarity). Sama untuk semua KTP dan SELFIE satu nomor dokumen dalam satu hit. **Selalu NULL untuk NPWP.** |
+| `face_similarity` | `numeric(5,4)` | Skor kemiripan wajah KTP vs SELFIE (0–1), lihat [Face similarity](#face-similarity). Sama untuk semua KTP dan SELFIE satu nomor dokumen, di semua hit. **Selalu NULL untuk NPWP.** |
 
 Aturan yang dijaga database (check constraint): `file_type` hanya tiga nilai di atas, SELFIE tidak punya `ocr_result`, NPWP tidak punya `face_similarity`, dan skor di rentang 0–1.
 
@@ -369,10 +370,34 @@ POST {FACE_BASE_URL}/api/v1/verification/verify     header x-api-key: {FACE_API_
 - Skor = `similarity` tertinggi di `result[].face_matches[]` (wajah di KTP yang paling mirip dengan selfie).
 - Tiket dengan lebih dari satu KTP atau SELFIE: setiap pasangan dibandingkan, yang disimpan skor tertinggi.
 - Skor NULL bila tiket tidak punya pasangan KTP–SELFIE (mis. `/ocr/npwp`, atau tiket tanpa selfie), atau verify gagal (service mati, API key salah, wajah tidak terdeteksi: `HTTP 400 ... "code": 28`). Kegagalan ditulis ke log `Tiket <id>: face verify gagal: ...` dan tidak menggagalkan request.
+- Skor ditulis lewat `set_face_similarity`, jadi ikut mengisi/menimpa baris KTP dan SELFIE nomor dokumen itu dari hit sebelumnya (skor terbaru yang berlaku). Hit yang verify-nya gagal tidak mengubah skor lama.
 - Skor hanya disimpan ke database; response API tidak berubah.
-- Verify berjalan setelah semua OCR request itu selesai, di thread pool yang sama, jadi menambah waktu response kira-kira satu panggilan verify.
+- Verify berjalan setelah semua OCR request itu selesai, di thread pool sendiri (`MAX_WORKERS` request serentak, terpisah dari pool OCR), jadi menambah waktu response kira-kira satu panggilan verify.
 
 Di Docker, `FACE_BASE_URL` default `http://host.docker.internal:8000` (CompreFace di host yang sama; `localhost` di dalam container menunjuk ke container itu sendiri). Isi `FACE_API_KEY` di `.env` lalu `docker compose up -d`. Tanpa `FACE_API_KEY` service menulis `WARNING FACE_API_KEY kosong` dan kolom `face_similarity` tetap NULL.
+
+### Backfill similarity data lama
+
+Baris yang tersimpan sebelum `FACE_API_KEY` diisi, atau yang verify-nya gagal, punya `face_similarity` NULL. `backfill_similarity` menghitungnya dari foto base64 yang sudah ada di tabel, tanpa memanggil DMS atau OCR, dengan aturan skor yang sama seperti saat hit API:
+
+```bash
+# Lihat nomor dokumen yang akan diproses (tidak butuh FACE_API_KEY)
+docker compose exec api python -m microsite_ocr.backfill_similarity --dry-run
+
+# Proses semua nomor dokumen yang masih punya skor NULL
+docker compose exec api python -m microsite_ocr.backfill_similarity
+
+# Nomor dokumen tertentu, termasuk yang sudah punya skor (hitung ulang)
+docker compose exec api python -m microsite_ocr.backfill_similarity 081156CqJu --rescore
+```
+
+- Yang diproses: nomor dokumen yang punya foto KTP **dan** SELFIE (`file_base64` tidak NULL) dan masih ada baris KTP/SELFIE dengan skor NULL (atau semua, dengan `--rescore`). Urut dari hit paling lama.
+- Foto yang dibandingkan: setiap `node_id` KTP dan SELFIE nomor dokumen itu (satu foto per `node_id`, dari hit terbaru), semua pasangan, skor tertinggi.
+- Opsi: `--limit N` (maksimal N nomor dokumen), `--batch-size N` (jumlah nomor dokumen yang fotonya dimuat ke memori sekaligus, default 20), `--file tickets.txt`.
+- Aman dijalankan berulang: run kedua tanpa `--rescore` hanya memproses yang masih NULL.
+- Exit code: `0` semua berhasil (termasuk bila tidak ada yang perlu diproses), `1` ada nomor dokumen yang semua verify-nya gagal (skornya tidak diubah, nomornya ditulis di log), `2` `DATABASE_URL` atau `FACE_API_KEY` kosong.
+
+Dari host (di luar container), set dulu `DATABASE_URL=postgresql://microsite:<sandi>@127.0.0.1:5432/microsite_ocr`, `FACE_BASE_URL=http://localhost:8000`, dan `FACE_API_KEY`, lalu `venv/bin/python -m microsite_ocr.backfill_similarity`.
 
 > **Data pribadi.** Tabel ini berisi foto KTP, foto wajah, dan NIK nasabah. Data tersimpan di volume Docker `api_microsite_pgdata`; `docker compose down -v` menghapusnya permanen. Perlakukan sesuai UU PDP.
 
@@ -561,14 +586,17 @@ microsite_ocr/
 ├── download.py     # CLI download: TicketDownloader, simpan file per tiket
 ├── config.py       # Settings dari env var
 ├── cli.py          # Bagian bersama kedua CLI: logging, argumen tiket, load_ticket_ids
-├── documents.py    # DocumentType, classify_filename, DmsDocument, DownloadedFile
+├── documents.py    # DocumentType, classify_filename, DmsDocument, DownloadedFile, ProcessedDocument
 ├── images.py       # detect_image_type dari signature file
 ├── dms_client.py   # DmsClient: search_by_ticket, download
 ├── ocr_client.py   # OcrClient.extract
 ├── quality.py      # check_quality: penanda field kosong & NIK tidak cocok
-├── store.py        # OcrStore: simpan dokumen ke tabel ocr_document (PostgreSQL)
-├── face_client.py  # FaceClient.verify: similarity SELFIE vs KTP (CompreFace)
-└── pipeline.py     # TicketOcrPipeline: search → download → OCR → cek kualitas → simpan, filter jenis, thread pool bersama
+├── face_client.py  # FaceClient.verify: HTTP ke CompreFace, similarity SELFIE vs KTP
+├── face_matching.py     # FaceMatcher, group_faces: aturan skor per nomor dokumen (pasangan, skor tertinggi)
+├── store.py        # OcrStore: semua SQL tabel ocr_document (simpan hit, set skor, query backfill)
+├── recorder.py     # HitRecorder: dokumen satu hit → face matching → store
+├── backfill_similarity.py  # CLI backfill: skor untuk data lama, pakai face_matching + store
+└── pipeline.py     # TicketOcrPipeline: search → download → OCR → cek kualitas → serahkan ke DocumentRecorder
 ```
 
 File deploy di root: `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `db/init/01_ocr_document.sql` (schema database). Collection Postman/Insomnia: `microsite_ocr.postman_collection.json`.
@@ -592,14 +620,22 @@ flowchart TD
     ocr --> images
     pipeline --> docs
     pipeline --> quality["quality.py"]
-    pipeline --> store["store.py<br/>OcrStore"]
-    pipeline --> face["face_client.py<br/>FaceClient"]
+    service --> recorder["recorder.py<br/>HitRecorder"]
+    main --> recorder
+    pipeline -. "DocumentRecorder (Protocol)" .-> recorder
+    recorder --> matching["face_matching.py<br/>FaceMatcher"]
+    recorder --> store["store.py<br/>OcrStore"]
+    backfill["backfill_similarity.py"] --> matching
+    backfill --> store
+    backfill --> cli
+    matching --> face["face_client.py<br/>FaceClient"]
     face --> images
     store --> docs
+    matching --> docs
     quality --> docs
 ```
 
-Client DMS dan OCR tidak saling tahu; pipeline yang menyambungkan keduanya. Menambah jenis dokumen baru (mis. SIM) cukup:
+Client DMS dan OCR tidak saling tahu; pipeline yang menyambungkan keduanya. Pipeline juga tidak tahu soal database maupun CompreFace: ia hanya menyerahkan `ProcessedDocument` satu hit ke `DocumentRecorder` (garis putus-putus). Penyimpanan dan face matching dirangkai di `recorder.py`; `service.py` dan `__main__.py` yang memasangnya. Aturan skor (`face_matching.py`) dan SQL (`store.py`) masing-masing ada di satu tempat, dipakai bersama oleh recorder dan backfill. Menambah jenis dokumen baru (mis. SIM) cukup:
 
 1. Tambah anggota di `DocumentType` (nilainya = path `/extract/<nilai>` di OCR API).
 2. Masukkan ke `supports_ocr` dan ke urutan pengecekan di `classify_filename`.
@@ -643,6 +679,7 @@ Belum ada dokumen NPWP di tiket uji, jadi jalur NPWP (`classify_filename` → `/
 | Service: `401 X-API-Key tidak valid` | Header `X-API-Key` tidak dikirim atau beda dengan `SERVICE_API_KEY`. |
 | Log `face verify gagal: ... Connection refused` | Face Verification Service tidak jalan di `FACE_BASE_URL`. Cek `curl -X POST localhost:8000/api/v1/verification/verify` dari host (harus dijawab, walau 4xx). |
 | Log `face verify gagal: HTTP 401` / `HTTP 400 ... "code": 28` | API key salah / wajah tidak terdeteksi di selfie atau KTP. Skor disimpan NULL. |
+| Backfill: `Nomor dokumen gagal (skor tidak diubah)` | Semua verify untuk nomor dokumen itu gagal; lihat baris `face verify gagal` di atasnya untuk penyebabnya. Jalankan ulang setelah diperbaiki. |
 | Log `Simpan N dokumen ke database gagal` | Container `db` mati atau `DATABASE_URL` salah. Cek `docker compose ps db`; hasil OCR tetap dikembalikan, hanya tidak tersimpan. |
 | `docker compose up`: `isi POSTGRES_PASSWORD di .env` | Tambahkan `POSTGRES_PASSWORD=<sandi>` ke `.env`. |
 | Service: `/health` → `degraded` | Lihat `dms_reachable` / `ocr_ready` untuk tahu mana yang bermasalah, lalu cek baris `:8688` / `:8070` di bawah. |

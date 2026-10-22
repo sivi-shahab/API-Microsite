@@ -42,3 +42,14 @@ class DmsDocument:
 class DownloadedFile:
     content: bytes
     content_type: str
+
+
+@dataclass(frozen=True)
+class ProcessedDocument:
+    """Satu dokumen yang sudah diproses dalam satu hit, siap direkam (lihat `recorder.py`)."""
+
+    document: DmsDocument
+    # None bila download gagal.
+    content: bytes | None
+    # Hasil OCR satu dokumen (bentuk `data[]` di response); None untuk SELFIE.
+    ocr_result: dict | None
