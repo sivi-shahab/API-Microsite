@@ -1,6 +1,6 @@
-# Microsite OCR Service.
+# Microsite OCR Service + PostgreSQL penyimpan hasil.
 #
-#   SERVICE_API_KEY=<kunci> docker compose up -d --build
+#   SERVICE_API_KEY=<kunci> POSTGRES_PASSWORD=<sandi> docker compose up -d --build
 #   curl localhost:8090/health
 #
 # OCR API (/data/ocr-qwen) dan DMS diakses lewat IP, jadi service ini tidak perlu
@@ -18,7 +18,35 @@ services:
       OCR_BASE_URL: ${OCR_BASE_URL:-http://10.168.105.11:8070}
       MAX_WORKERS: ${MAX_WORKERS:-4}
       SERVICE_API_KEY: ${SERVICE_API_KEY:-}
+      DATABASE_URL: postgresql://microsite:${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD di .env}@db:5432/microsite_ocr
       TZ: ${TZ:-Asia/Jakarta}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    # Hanya dari host ini (psql, proses face matching); tidak dibuka ke jaringan.
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: microsite_ocr
+      POSTGRES_USER: microsite
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD di .env}
+      TZ: ${TZ:-Asia/Jakarta}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Dijalankan sekali saat volume pgdata masih kosong.
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U microsite -d microsite_ocr"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
 
 networks:
   default:

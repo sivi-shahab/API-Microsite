@@ -1,4 +1,6 @@
 requests>=2.31
+# Simpan hasil ke PostgreSQL (DATABASE_URL)
+psycopg[binary]>=3.1
 # Hanya untuk service HTTP (python -m microsite_ocr.service)
 fastapi>=0.111.0
 uvicorn[standard]>=0.29.0

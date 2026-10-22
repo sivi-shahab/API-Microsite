@@ -16,6 +16,8 @@ class Settings:
     # Kosong = tanpa autentikasi. Bila diisi, setiap request wajib mengirim header X-API-Key.
     api_key: str = ""
     max_tickets_per_request: int = 50
+    # PostgreSQL untuk menyimpan setiap dokumen yang diproses. Kosong = tidak disimpan.
+    database_url: str = ""
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -30,4 +32,5 @@ class Settings:
             port=int(os.getenv("PORT", defaults.port)),
             api_key=os.getenv("SERVICE_API_KEY", defaults.api_key),
             max_tickets_per_request=int(os.getenv("MAX_TICKETS_PER_REQUEST", defaults.max_tickets_per_request)),
+            database_url=os.getenv("DATABASE_URL", defaults.database_url),
         )

@@ -32,6 +32,7 @@ from .openapi_examples import (
     TICKETS_RESPONSES,
 )
 from .pipeline import TicketOcrPipeline, TicketResult
+from .store import OcrStore
 
 logger = logging.getLogger(__name__)
 
@@ -66,12 +67,15 @@ def create_app(settings: Settings) -> FastAPI:
     async def lifespan(app: FastAPI):
         if not settings.api_key:
             logger.warning("SERVICE_API_KEY kosong: service berjalan tanpa autentikasi")
-        with TicketOcrPipeline(dms=dms, ocr=ocr, max_workers=settings.max_workers) as pipeline:
+        if not store:
+            logger.warning("DATABASE_URL kosong: hasil tidak disimpan ke database")
+        with TicketOcrPipeline(dms=dms, ocr=ocr, max_workers=settings.max_workers, store=store) as pipeline:
             app.state.pipeline = pipeline
             yield
 
     dms = DmsClient.from_settings(settings)
     ocr = OcrClient.from_settings(settings)
+    store = OcrStore.from_settings(settings)
 
     app = FastAPI(
         title="Microsite OCR Service",

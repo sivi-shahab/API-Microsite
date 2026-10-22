@@ -8,6 +8,8 @@ Service HTTP (dan CLI) untuk mengambil dokumen **KTP/NPWP** dari DMS-Cardsys ber
             /tickets/ocr[/ktp|/npwp]                              /extract/npwp
 ```
 
+Setiap dokumen yang diproses (KTP, NPWP, dan SELFIE) juga disimpan ke PostgreSQL, lihat [Database](#database).
+
 Logika yang sama tersedia sebagai CLI (`python3 -m microsite_ocr --file tickets.txt`, tambah `--type ktp|npwp` untuk satu jenis saja) untuk proses batch.
 
 ## Daftar isi
@@ -18,6 +20,7 @@ Logika yang sama tersedia sebagai CLI (`python3 -m microsite_ocr --file tickets.
     - [Contoh response](#contoh-response)
   - [Postman / Insomnia](#postman--insomnia)
   - [Deploy dengan Docker](#deploy-dengan-docker)
+- [Database](#database)
 - [Quick start (CLI)](#quick-start-cli)
 - [Alur](#alur)
 - [Konfigurasi](#konfigurasi)
@@ -294,12 +297,66 @@ curl localhost:8090/health
 docker compose logs -f api
 ```
 
+- Compose menjalankan dua container: `api` dan `db` (PostgreSQL 16, lihat [Database](#database)). `POSTGRES_PASSWORD` wajib diisi; di server ini ada di `.env`.
 - Deploy di server ini menyimpan `SERVICE_API_KEY` di `/data/api_microsite/.env` (permission `600`), yang dibaca otomatis oleh `docker compose up -d`. Ambil key-nya dengan `grep SERVICE_API_KEY .env`; untuk mengganti key, ubah file itu lalu jalankan `docker compose up -d` lagi.
 - `docker-compose.yml` meneruskan `DMS_BASE_URL`, `OCR_BASE_URL`, `MAX_WORKERS`, `SERVICE_API_KEY` dari shell/`.env`; port host diatur lewat `SERVICE_PORT` (default 8090).
 - Zona waktu container (dan timestamp log) diatur lewat `TZ`, default `Asia/Jakarta`.
 - Network compose memakai **MTU 1400** (`DOCKER_MTU`), sama dengan NIC server `enp1s0`. Dengan default Docker 1500, search ke DMS berhasil tapi download file gambar selalu `Read timed out`.
 - `.dockerignore` hanya mengizinkan `requirements.txt` dan `microsite_ocr/`, jadi foto KTP/selfie, `downloads/`, dan `hasil_ocr.json` tidak ikut masuk image.
 - `HEALTHCHECK` container memanggil `/health`; status container `unhealthy` bila DMS atau OCR API tidak siap.
+
+## Database
+
+Container `db` (`postgres:16-alpine`, database `microsite_ocr`, user `microsite`) menyimpan setiap dokumen dari setiap hit endpoint OCR ke tabel `ocr_document`. Schema ada di `db/init/01_ocr_document.sql` dan dijalankan otomatis **hanya saat volume `pgdata` masih kosong**; perubahan schema berikutnya harus dijalankan manual dengan `psql`.
+
+| Kolom | Tipe | Isi |
+|---|---|---|
+| `id` | `uuid` | Primary key, `gen_random_uuid()` |
+| `hit_at` | `timestamptz` | Waktu API di-hit. Semua dokumen dari satu request memakai nilai yang sama. |
+| `nomor_dokumen` | `varchar(64)` | Nomor tiket (`NomorDokumen`) |
+| `create_date` | `timestamp` | `createDate` dari search DMS (waktu lokal DMS); NULL bila formatnya tidak dikenali |
+| `file_type` | `varchar(10)` | `ktp`, `npwp`, atau `selfie` |
+| `node_id` | `varchar(64)` | `nodeId` dokumen di DMS |
+| `file_base64` | `text` | Isi file dari DMS, base64; NULL bila download gagal |
+| `ocr_result` | `jsonb` | Satu objek `data[]` dari response (node_id, filename, document_type, created_at, data, warnings, error). **NULL untuk SELFIE.** |
+| `face_similarity` | `numeric(5,4)` | Skor kemiripan wajah KTP vs SELFIE (0–1). Belum diisi; disiapkan untuk proses face matching. **Selalu NULL untuk NPWP.** |
+
+Aturan yang dijaga database (check constraint): `file_type` hanya tiga nilai di atas, SELFIE tidak punya `ocr_result`, NPWP tidak punya `face_similarity`, dan skor di rentang 0–1.
+
+Kapan baris ditulis:
+
+- Satu baris per dokumen per hit. Tiket yang di-hit dua kali menghasilkan dua set baris; ambil yang terbaru dengan `ORDER BY hit_at DESC`.
+- KTP/NPWP ditulis untuk jenis yang diminta endpoint, termasuk yang gagal OCR (`ocr_result.error` terisi).
+- SELFIE di-download (tanpa OCR) dan ditulis setiap kali KTP diminta (`/ocr`, `/ocr/ktp`), supaya pasangan KTP–SELFIE siap untuk face matching. Di `/ocr/npwp` SELFIE tidak di-download. Response API tidak berubah: SELFIE tetap tercatat di `skipped`.
+- Tiket tidak ditemukan atau gagal search tidak menghasilkan baris. Dokumen jenis `unknown` tidak disimpan.
+- Bila database tidak bisa diakses, request **tetap** mengembalikan hasil OCR; kegagalan hanya ditulis ke log (`Simpan N dokumen ke database gagal`).
+
+**Similarity per nomor dokumen.** KTP dan SELFIE dengan nomor dokumen yang sama harus punya skor yang sama, jadi isi skor lewat fungsi `set_face_similarity`, bukan `UPDATE` per baris. Fungsi ini mengisi semua baris KTP dan SELFIE nomor dokumen itu (NPWP tidak disentuh) dan mengembalikan jumlah baris yang diubah:
+
+```sql
+SELECT set_face_similarity('081156CqJu', 0.8731);
+```
+
+Akses dari host (port hanya dibuka di `127.0.0.1:5432`, atur lewat `POSTGRES_PORT`):
+
+```bash
+docker compose exec db psql -U microsite -d microsite_ocr
+# atau dari host / proses lain:
+psql "postgresql://microsite:$(grep POSTGRES_PASSWORD .env | cut -d= -f2-)@127.0.0.1:5432/microsite_ocr"
+```
+
+```sql
+-- Ringkasan hit terakhir, tanpa kolom base64 yang besar
+SELECT hit_at, nomor_dokumen, file_type, node_id, ocr_result->'data'->>'NIK' AS nik, face_similarity
+FROM ocr_document ORDER BY hit_at DESC LIMIT 20;
+
+-- Simpan kembali foto dari base64
+psql ... -Atc "SELECT file_base64 FROM ocr_document WHERE id = '<uuid>'" | base64 -d > foto.jpg
+```
+
+CLI juga menyimpan ke database bila `DATABASE_URL` diisi; tanpa `DATABASE_URL` tidak ada yang disimpan.
+
+> **Data pribadi.** Tabel ini berisi foto KTP, foto wajah, dan NIK nasabah. Data tersimpan di volume Docker `api_microsite_pgdata`; `docker compose down -v` menghapusnya permanen. Perlakukan sesuai UU PDP.
 
 ## Quick start (CLI)
 
@@ -369,6 +426,7 @@ Semua lewat environment variable:
 | `PORT` | `8090` | Service: port listen |
 | `SERVICE_API_KEY` | kosong | Service: nilai header `X-API-Key` yang wajib dikirim. Kosong = tanpa autentikasi. |
 | `MAX_TICKETS_PER_REQUEST` | `50` | Service: batas jumlah tiket di `POST /tickets/ocr` |
+| `DATABASE_URL` | kosong | PostgreSQL penyimpan hasil, mis. `postgresql://user:pass@host:5432/db`. Kosong = tidak disimpan. Di Docker diisi otomatis dari `POSTGRES_PASSWORD`. |
 
 Contoh:
 
@@ -487,10 +545,11 @@ microsite_ocr/
 ├── dms_client.py   # DmsClient: search_by_ticket, download
 ├── ocr_client.py   # OcrClient.extract
 ├── quality.py      # check_quality: penanda field kosong & NIK tidak cocok
-└── pipeline.py     # TicketOcrPipeline: search → download → OCR → cek kualitas, filter jenis, thread pool bersama
+├── store.py        # OcrStore: simpan dokumen ke tabel ocr_document (PostgreSQL)
+└── pipeline.py     # TicketOcrPipeline: search → download → OCR → cek kualitas → simpan, filter jenis, thread pool bersama
 ```
 
-File deploy di root: `Dockerfile`, `docker-compose.yml`, `.dockerignore`. Collection Postman/Insomnia: `microsite_ocr.postman_collection.json`.
+File deploy di root: `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `db/init/01_ocr_document.sql` (schema database). Collection Postman/Insomnia: `microsite_ocr.postman_collection.json`.
 
 ```mermaid
 flowchart TD
@@ -511,6 +570,8 @@ flowchart TD
     ocr --> images
     pipeline --> docs
     pipeline --> quality["quality.py"]
+    pipeline --> store["store.py<br/>OcrStore"]
+    store --> docs
     quality --> docs
 ```
 
@@ -556,6 +617,8 @@ Belum ada dokumen NPWP di tiket uji, jadi jalur NPWP (`classify_filename` → `/
 | Gejala | Penyebab & solusi |
 |---|---|
 | Service: `401 X-API-Key tidak valid` | Header `X-API-Key` tidak dikirim atau beda dengan `SERVICE_API_KEY`. |
+| Log `Simpan N dokumen ke database gagal` | Container `db` mati atau `DATABASE_URL` salah. Cek `docker compose ps db`; hasil OCR tetap dikembalikan, hanya tidak tersimpan. |
+| `docker compose up`: `isi POSTGRES_PASSWORD di .env` | Tambahkan `POSTGRES_PASSWORD=<sandi>` ke `.env`. |
 | Service: `/health` → `degraded` | Lihat `dms_reachable` / `ocr_ready` untuk tahu mana yang bermasalah, lalu cek baris `:8688` / `:8070` di bawah. |
 | Service di Docker: `Read timed out` saat download DMS, padahal dari host lancar | MTU network Docker lebih besar dari NIC server. Pastikan `DOCKER_MTU` = MTU NIC (`ip link show enp1s0`), lalu `docker compose down && docker compose up -d`. |
 | `ConnectionError` ke `:8688` | DMS tidak terjangkau dari server ini. Cek `curl http://10.191.22.16:8688/api/v2/search` dan `DMS_BASE_URL`. |

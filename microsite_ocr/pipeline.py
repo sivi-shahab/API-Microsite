@@ -2,11 +2,13 @@ import logging
 from collections.abc import Collection
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 from .dms_client import DmsClient
 from .documents import DmsDocument, DocumentType
 from .ocr_client import OcrClient
 from .quality import QualityWarning, check_quality
+from .store import OcrStore, StoredDocument
 
 logger = logging.getLogger(__name__)
 
@@ -47,15 +49,18 @@ OcrJob = tuple[TicketResult, DmsDocument]
 
 
 class TicketOcrPipeline:
-    """Tiket → search DMS → download KTP/NPWP → OCR.
+    """Tiket → search DMS → download KTP/NPWP → OCR → (opsional) simpan ke database.
 
     Thread pool OCR dipakai bersama oleh semua pemanggil `run`, jadi di service HTTP
     jumlah request OCR serentak tetap dibatasi `max_workers` walau ada banyak request masuk.
+    Bila `store` diisi, SELFIE ikut di-download (tanpa OCR) setiap kali KTP diminta,
+    supaya pasangan KTP–SELFIE tersedia untuk face matching.
     """
 
-    def __init__(self, dms: DmsClient, ocr: OcrClient, max_workers: int):
+    def __init__(self, dms: DmsClient, ocr: OcrClient, max_workers: int, store: OcrStore | None = None):
         self._dms = dms
         self._ocr = ocr
+        self._store = store
         self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="ocr")
 
     def close(self) -> None:
@@ -69,24 +74,50 @@ class TicketOcrPipeline:
 
     def run(self, ticket_ids: list[str], doc_types: Collection[DocumentType] | None = None) -> list[TicketResult]:
         """OCR dokumen tiket; `doc_types` membatasi jenis yang di-OCR (default: semua yang `supports_ocr`)."""
+        hit_at = datetime.now(timezone.utc)
         results = [TicketResult(ticket_id) for ticket_id in ticket_ids]
-        jobs = [job for result in results for job in self._collect_jobs(result, doc_types)]
+        jobs: list[OcrJob] = []
+        selfies: list[DmsDocument] = []
+        for result in results:
+            ticket_jobs, ticket_selfies = self._collect_jobs(result, doc_types)
+            jobs += ticket_jobs
+            selfies += ticket_selfies
 
-        # OCR dijalankan paralel; vLLM mem-batch request bersamaan.
+        # OCR dijalankan paralel; vLLM mem-batch request bersamaan. Download SELFIE ikut antre di pool yang sama.
         processed = self._executor.map(lambda job: self._process_document(job[1]), jobs)
-        for (result, _), document_result in zip(jobs, processed):
-            result.data.append(document_result)
+        selfie_contents = self._executor.map(self._download_selfie, selfies)
 
+        stored = []
+        for (result, document), (document_result, content) in zip(jobs, processed):
+            result.data.append(document_result)
+            stored.append(StoredDocument(document, content, document_result))
+        stored += [StoredDocument(document, content, None) for document, content in zip(selfies, selfie_contents)]
+
+        self._save(hit_at, stored)
         return results
 
-    def _collect_jobs(self, result: TicketResult, doc_types: Collection[DocumentType] | None) -> list[OcrJob]:
-        """Search dokumen tiket; jenis yang diminta jadi job OCR, sisanya dicatat di `skipped`."""
+    def _save(self, hit_at: datetime, stored: list[StoredDocument]) -> None:
+        """Gagal simpan hanya dicatat di log; hasil OCR tetap dikembalikan."""
+        if not self._store:
+            return
+        try:
+            self._store.save(hit_at, stored)
+        except Exception as exc:
+            logger.error("Simpan %d dokumen ke database gagal: %s", len(stored), exc)
+
+    def _collect_jobs(
+        self, result: TicketResult, doc_types: Collection[DocumentType] | None
+    ) -> tuple[list[OcrJob], list[DmsDocument]]:
+        """Search dokumen tiket; jenis yang diminta jadi job OCR, sisanya dicatat di `skipped`.
+
+        Juga mengembalikan SELFIE yang perlu di-download untuk disimpan (lihat docstring kelas).
+        """
         try:
             documents = self._dms.search_by_ticket(result.ticket_id)
         except Exception as exc:
             logger.error("Tiket %s: search gagal: %s", result.ticket_id, exc)
             result.error = str(exc)
-            return []
+            return [], []
 
         # Tiket tanpa dokumen bukan error; hasilnya cukup `data: []`.
         if not documents:
@@ -98,21 +129,34 @@ class TicketOcrPipeline:
                 jobs.append((result, document))
             else:
                 result.skipped.append(f"{document.type.value}: {document.node_id}")
-        return jobs
 
-    def _process_document(self, document: DmsDocument) -> DocumentResult:
+        store_selfies = self._store is not None and (doc_types is None or DocumentType.KTP in doc_types)
+        selfies = [document for document in documents if store_selfies and document.type is DocumentType.SELFIE]
+        return jobs, selfies
+
+    def _process_document(self, document: DmsDocument) -> tuple[DocumentResult, bytes | None]:
+        """Download + OCR satu dokumen; kembalikan juga isi file (None bila download gagal) untuk disimpan."""
         result = DocumentResult.for_document(document)
         label = f"Tiket {document.ticket_id}: {document.type.value} {document.node_id}"
+        content = None
         try:
             file = self._dms.download(document.node_id)
+            content = file.content
             result.data = self._ocr.extract(document.type, file, name=document.node_id)
             result.warnings = check_quality(document, result.data)
         except Exception as exc:
             logger.error("%s gagal: %s", label, exc)
             result.error = str(exc)
-            return result
+            return result, content
 
         logger.info("%s selesai", label)
         for warning in result.warnings:
             logger.warning("%s: %s", label, warning.message)
-        return result
+        return result, content
+
+    def _download_selfie(self, document: DmsDocument) -> bytes | None:
+        try:
+            return self._dms.download(document.node_id).content
+        except Exception as exc:
+            logger.error("Tiket %s: selfie %s gagal di-download: %s", document.ticket_id, document.node_id, exc)
+            return None
