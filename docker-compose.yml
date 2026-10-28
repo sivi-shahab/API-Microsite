@@ -16,6 +16,8 @@ services:
     environment:
       DMS_BASE_URL: ${DMS_BASE_URL:-http://10.191.22.16:8688}
       OCR_BASE_URL: ${OCR_BASE_URL:-http://10.168.105.11:8070}
+      # Wajib: OCR API menolak /extract/* tanpa X-API-Key (401).
+      OCR_API_KEY: ${OCR_API_KEY:?isi OCR_API_KEY di .env}
       MAX_WORKERS: ${MAX_WORKERS:-4}
       SERVICE_API_KEY: ${SERVICE_API_KEY:-}
       DATABASE_URL: postgresql://microsite:${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD di .env}@db:5432/microsite_ocr

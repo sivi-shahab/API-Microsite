@@ -4,8 +4,8 @@ Service HTTP (dan CLI) untuk mengambil dokumen **KTP/NPWP** dari DMS-Cardsys ber
 
 ```
  client ──► microsite_ocr :8090 ──► DMS-Cardsys :8688 ──► OCR API :8070
- (HTTP)     /tickets/{id}/ocr[/ktp|/npwp]   search + download     /extract/ktp
-            /tickets/ocr[/ktp|/npwp]                              /extract/npwp
+ (HTTP)     /tickets/{id}/ocr[/ktp|/npwp]   search + download     /extract/ktp/base64
+            /tickets/ocr[/ktp|/npwp]                              /extract/npwp/base64
 ```
 
 Setiap dokumen yang diproses (KTP, NPWP, dan SELFIE) juga disimpan ke PostgreSQL bersama skor kemiripan wajah KTP vs SELFIE dari Face Verification Service (CompreFace), lihat [Database](#database) dan [Face similarity](#face-similarity).
@@ -301,7 +301,8 @@ docker compose logs -f api
 
 - Compose menjalankan dua container: `api` dan `db` (PostgreSQL 16, lihat [Database](#database)). `POSTGRES_PASSWORD` wajib diisi; di server ini ada di `.env`.
 - Deploy di server ini menyimpan `SERVICE_API_KEY` di `/data/api_microsite/.env` (permission `600`), yang dibaca otomatis oleh `docker compose up -d`. Ambil key-nya dengan `grep SERVICE_API_KEY .env`; untuk mengganti key, ubah file itu lalu jalankan `docker compose up -d` lagi.
-- `docker-compose.yml` meneruskan `DMS_BASE_URL`, `OCR_BASE_URL`, `MAX_WORKERS`, `SERVICE_API_KEY` dari shell/`.env`; port host diatur lewat `SERVICE_PORT` (default 8090).
+- `OCR_API_KEY` juga disimpan di `.env` dan **wajib** untuk compose (`docker compose up` gagal bila kosong), karena OCR API menolak request tanpa key dengan HTTP 401.
+- `docker-compose.yml` meneruskan `DMS_BASE_URL`, `OCR_BASE_URL`, `OCR_API_KEY`, `MAX_WORKERS`, `SERVICE_API_KEY` dari shell/`.env`; port host diatur lewat `SERVICE_PORT` (default 8090).
 - Zona waktu container (dan timestamp log) diatur lewat `TZ`, default `Asia/Jakarta`.
 - Network compose memakai **MTU 1400** (`DOCKER_MTU`), sama dengan NIC server `enp1s0`. Dengan default Docker 1500, search ke DMS berhasil tapi download file gambar selalu `Read timed out`.
 - `.dockerignore` hanya mengizinkan `requirements.txt` dan `microsite_ocr/`, jadi foto KTP/selfie, `downloads/`, dan `hasil_ocr.json` tidak ikut masuk image.
@@ -442,7 +443,7 @@ sequenceDiagram
         S->>D: GET /api/v2/download?id=<nodeId>
         D-->>S: file gambar
         S->>S: Deteksi format dari signature file
-        S->>O: POST /extract/ktp atau /extract/npwp (multipart "file")
+        S->>O: POST /extract/ktp/base64 atau /extract/npwp/base64<br/>X-API-Key + JSON {"image": "<base64>"}
         O-->>S: {"success":true,"data":{...}}
     end
 ```
@@ -450,7 +451,8 @@ sequenceDiagram
 Poin penting:
 
 - **Jenis dokumen dari nama file.** DMS memakai dua pola, `KTP_<NIK>` dan `<prefix>_KTP_<NIK>`, jadi `KTP`/`NPWP`/`SELFIE` dicari di setiap segmen yang dipisah `_`. SELFIE dan jenis lain dilewati dan dicatat di `skipped`.
-- **Format gambar dari isi file**, bukan dari ekstensi atau `content-type` DMS (contoh di koleksi Insomnia memakai `extension: jpg` untuk file PNG). Yang didukung OCR API: JPEG, PNG, WebP.
+- **Format gambar dari isi file**, bukan dari ekstensi atau `content-type` DMS (contoh di koleksi Insomnia memakai `extension: jpg` untuk file PNG). Yang didukung OCR API: JPEG, PNG, WebP. File lain ditolak sebelum dikirim ke OCR API.
+- **Gambar dikirim sebagai base64** ke endpoint `/extract/<jenis>/base64` (body JSON `{"image": "<base64>"}`), dengan header `X-API-Key` dari `OCR_API_KEY`. Endpoint multipart `/extract/<jenis>` tidak dipakai lagi.
 - **Search berjalan berurutan, OCR paralel.** vLLM di belakang OCR API mem-batch request bersamaan, jadi 4 request sekaligus selesai hampir secepat satu (±7 detik).
 - **Error tidak menghentikan batch.** Tiket atau dokumen yang gagal diberi `error` di hasilnya; sisanya tetap diproses. Tiket yang tidak ditemukan di DMS bukan error: hasilnya `"data": []` dan `"error": null`.
 
@@ -462,6 +464,7 @@ Semua lewat environment variable:
 |---|---|---|
 | `DMS_BASE_URL` | `http://10.191.22.16:8688` | Host DMS-Cardsys (UAT) |
 | `OCR_BASE_URL` | `http://10.168.105.11:8070` | Host OCR API |
+| `OCR_API_KEY` | kosong | Nilai header `X-API-Key` ke OCR API, salah satu key di `API_KEYS` pada `/data/ocr-qwen/.env`. Wajib bila OCR API memakai autentikasi (default production); kosong = header tidak dikirim. |
 | `DMS_TIMEOUT` | `30` | Timeout request DMS (detik) |
 | `OCR_TIMEOUT` | `120` | Timeout request OCR (detik) |
 | `MAX_WORKERS` | `4` | Jumlah request OCR paralel (di service: total untuk semua request masuk) |
@@ -477,7 +480,7 @@ Semua lewat environment variable:
 Contoh:
 
 ```bash
-OCR_BASE_URL=http://localhost:8070 MAX_WORKERS=8 python3 -m microsite_ocr --file tickets.txt
+OCR_BASE_URL=http://localhost:8070 OCR_API_KEY=<key> MAX_WORKERS=8 python3 -m microsite_ocr --file tickets.txt
 ```
 
 ## Output
@@ -637,7 +640,7 @@ flowchart TD
 
 Client DMS dan OCR tidak saling tahu; pipeline yang menyambungkan keduanya. Pipeline juga tidak tahu soal database maupun CompreFace: ia hanya menyerahkan `ProcessedDocument` satu hit ke `DocumentRecorder` (garis putus-putus). Penyimpanan dan face matching dirangkai di `recorder.py`; `service.py` dan `__main__.py` yang memasangnya. Aturan skor (`face_matching.py`) dan SQL (`store.py`) masing-masing ada di satu tempat, dipakai bersama oleh recorder dan backfill. Menambah jenis dokumen baru (mis. SIM) cukup:
 
-1. Tambah anggota di `DocumentType` (nilainya = path `/extract/<nilai>` di OCR API).
+1. Tambah anggota di `DocumentType` (nilainya = path `/extract/<nilai>/base64` di OCR API).
 2. Masukkan ke `supports_ocr` dan ke urutan pengecekan di `classify_filename`.
 3. Tambah nilainya ke `OcrDocType` di `service.py` supaya ada endpoint `/ocr/<nilai>`; `--type` di CLI otomatis ikut.
 4. Tambah contoh response jenis baru di `openapi_examples.py`, lalu buat ulang collection Postman (`python -m microsite_ocr.postman`).
@@ -681,6 +684,7 @@ Belum ada dokumen NPWP di tiket uji, jadi jalur NPWP (`classify_filename` → `/
 | Service: `401 X-API-Key tidak valid` | Header `X-API-Key` tidak dikirim atau beda dengan `SERVICE_API_KEY`. |
 | Log `face verify gagal: ... Connection refused` | Face Verification Service tidak jalan di `FACE_BASE_URL`. Cek `curl -X POST localhost:8000/api/v1/verification/verify` dari host (harus dijawab, walau 4xx). |
 | Log `face verify gagal: HTTP 401` / `HTTP 400 ... "code": 28` | API key salah / wajah tidak terdeteksi di selfie atau KTP. Skor disimpan NULL. |
+| Log `face verify gagal: HTTP 500 ... compreface-core:3000/find_faces` | `compreface-core` kehilangan akses GPU (container `unhealthy`, log `no CUDA-capable device is detected`; `docker exec compreface-compreface-core-1 nvidia-smi` → `Failed to initialize NVML`). Pulihkan dengan `docker restart compreface-compreface-core-1`, lalu backfill tiket yang terlewat. |
 | Backfill: `Nomor dokumen gagal (skor tidak diubah)` | Semua verify untuk nomor dokumen itu gagal; lihat baris `face verify gagal` di atasnya untuk penyebabnya. Jalankan ulang setelah diperbaiki. |
 | Log `Simpan N dokumen ke database gagal` | Container `db` mati atau `DATABASE_URL` salah. Cek `docker compose ps db`; hasil OCR tetap dikembalikan, hanya tidak tersimpan. |
 | `docker compose up`: `isi POSTGRES_PASSWORD di .env` | Tambahkan `POSTGRES_PASSWORD=<sandi>` ke `.env`. |
@@ -689,6 +693,7 @@ Belum ada dokumen NPWP di tiket uji, jadi jalur NPWP (`classify_filename` → `/
 | `ConnectionError` ke `:8688` | DMS tidak terjangkau dari server ini. Cek `curl http://10.191.22.16:8688/api/v2/search` dan `DMS_BASE_URL`. |
 | `ConnectionError` ke `:8070` | OCR API mati. Cek `curl http://10.168.105.11:8070/health`; di server OCR jalankan `docker compose ps` di `/data/ocr-qwen`. |
 | `OCR ktp gagal: HTTP 500` | vLLM tidak siap. `/health` akan menunjukkan `"status":"degraded"`. |
+| `OCR ... HTTP 401 ... X-API-Key` | `OCR_API_KEY` kosong atau tidak ada di `API_KEYS` OCR API. Samakan dengan `/data/ocr-qwen/.env`, lalu `docker compose up -d`. |
 | `OCR ... HTTP 413` | Gambar lebih dari 10 MB. |
 | `File bukan JPEG, PNG, atau WebP` | File di DMS bukan gambar (mis. PDF) atau rusak. |
 | `Search tiket ... gagal: <code>` | DMS mengembalikan `code` selain `00`. |

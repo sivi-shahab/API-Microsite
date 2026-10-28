@@ -142,7 +142,7 @@ class TicketOcrPipeline:
         try:
             file = self._dms.download(document.node_id)
             content = file.content
-            result.data = self._ocr.extract(document.type, file, name=document.node_id)
+            result.data = self._ocr.extract(document.type, file)
             result.warnings = check_quality(document, result.data)
         except Exception as exc:
             logger.error("%s gagal: %s", label, exc)

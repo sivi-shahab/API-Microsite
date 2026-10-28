@@ -1,3 +1,5 @@
+import base64
+
 import requests
 
 from .config import Settings
@@ -10,16 +12,24 @@ class OcrError(RuntimeError):
 
 
 class OcrClient:
-    """Klien OCR API (Qwen2.5-VL) untuk endpoint /extract/ktp dan /extract/npwp."""
+    """Klien OCR API (Qwen2.5-VL) untuk endpoint /extract/ktp/base64 dan /extract/npwp/base64."""
 
-    def __init__(self, base_url: str, timeout_seconds: float, session: requests.Session | None = None):
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str,
+        timeout_seconds: float,
+        session: requests.Session | None = None,
+    ):
         self._base_url = base_url
         self._timeout = timeout_seconds
         self._session = session or requests.Session()
+        if api_key:
+            self._session.headers["X-API-Key"] = api_key
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "OcrClient":
-        return cls(settings.ocr_base_url, settings.ocr_timeout_seconds)
+        return cls(settings.ocr_base_url, settings.ocr_api_key, settings.ocr_timeout_seconds)
 
     def is_ready(self, timeout_seconds: float) -> bool:
         try:
@@ -28,14 +38,15 @@ class OcrClient:
         except (requests.RequestException, ValueError):
             return False
 
-    def extract(self, doc_type: DocumentType, file: DownloadedFile, name: str) -> dict:
+    def extract(self, doc_type: DocumentType, file: DownloadedFile) -> dict:
         if not doc_type.supports_ocr:
             raise ValueError(f"Dokumen {doc_type.value} tidak didukung OCR")
 
-        content_type, extension = detect_image_type(file.content)
+        # Ditolak di sini supaya file non-gambar tidak dikirim; OCR API sendiri tidak butuh content-type.
+        detect_image_type(file.content)
         response = self._session.post(
-            f"{self._base_url}/extract/{doc_type.value}",
-            files={"file": (f"{name}.{extension}", file.content, content_type)},
+            f"{self._base_url}/extract/{doc_type.value}/base64",
+            json={"image": base64.b64encode(file.content).decode("ascii")},
             timeout=self._timeout,
         )
         if not response.ok:
