@@ -294,15 +294,17 @@ Satu request batch 7 tiket (8 KTP) selesai ±14 detik. Request OCR serentak dari
 
 ```bash
 cd /data/api_microsite
-SERVICE_API_KEY=<kunci> docker compose up -d --build
+cp .env.example .env && chmod 600 .env   # sekali saja, lalu isi nilai rahasia
+docker compose up -d --build
 curl localhost:8090/health
 docker compose logs -f api
 ```
 
-- Compose menjalankan dua container: `api` dan `db` (PostgreSQL 16, lihat [Database](#database)). `POSTGRES_PASSWORD` wajib diisi; di server ini ada di `.env`.
-- Deploy di server ini menyimpan `SERVICE_API_KEY` di `/data/api_microsite/.env` (permission `600`), yang dibaca otomatis oleh `docker compose up -d`. Ambil key-nya dengan `grep SERVICE_API_KEY .env`; untuk mengganti key, ubah file itu lalu jalankan `docker compose up -d` lagi.
-- `OCR_API_KEY` juga disimpan di `.env` dan **wajib** untuk compose (`docker compose up` gagal bila kosong), karena OCR API menolak request tanpa key dengan HTTP 401.
-- `docker-compose.yml` meneruskan `DMS_BASE_URL`, `OCR_BASE_URL`, `OCR_API_KEY`, `MAX_WORKERS`, `SERVICE_API_KEY` dari shell/`.env`; port host diatur lewat `SERVICE_PORT` (default 8090).
+- Compose menjalankan dua container: `api` dan `db` (PostgreSQL 16, lihat [Database](#database)).
+- Semua parameter ada di `/data/api_microsite/.env` (permission `600`), yang dibaca otomatis oleh `docker compose up -d`. Template-nya `.env.example` (di-commit, tanpa nilai rahasia); `.env` dan `.env.*` lain diabaikan git dan tidak ikut ke image. Daftar lengkapnya di [Konfigurasi](#konfigurasi).
+- `SERVICE_API_KEY`, `OCR_API_KEY`, dan `POSTGRES_PASSWORD` **wajib**: `docker compose up` gagal bila salah satunya kosong. `SERVICE_API_KEY` wajib karena response berisi data nasabah; `OCR_API_KEY` karena OCR API menolak request tanpa key dengan HTTP 401. Buat nilai baru dengan `openssl rand -hex 32`.
+- Ambil key dengan `grep SERVICE_API_KEY .env`; untuk mengganti nilai, ubah `.env` lalu jalankan `docker compose up -d` lagi.
+- `POSTGRES_USER`, `POSTGRES_DB`, dan `POSTGRES_PASSWORD` hanya dipakai PostgreSQL saat volume `pgdata` masih kosong. Mengubahnya setelah itu tidak mengganti user/sandi di database, hanya `DATABASE_URL` container `api`, sehingga koneksi gagal; ganti sandi lewat `ALTER USER` dulu.
 - Zona waktu container (dan timestamp log) diatur lewat `TZ`, default `Asia/Jakarta`.
 - Network compose memakai **MTU 1400** (`DOCKER_MTU`), sama dengan NIC server `enp1s0`. Dengan default Docker 1500, search ke DMS berhasil tapi download file gambar selalu `Read timed out`.
 - `.dockerignore` hanya mengizinkan `requirements.txt` dan `microsite_ocr/`, jadi foto KTP/selfie, `downloads/`, dan `hasil_ocr.json` tidak ikut masuk image.
@@ -458,7 +460,7 @@ Poin penting:
 
 ## Konfigurasi
 
-Semua lewat environment variable:
+Semua lewat environment variable. Untuk Docker, isi di `.env` (template `.env.example`). Nilai yang tidak valid (bukan angka, kurang dari 1, atau URL tanpa `http://`/`https://`) membuat proses gagal start dengan `ConfigError` yang menyebut nama variabelnya. Field rahasia (`OCR_API_KEY`, `SERVICE_API_KEY`, `FACE_API_KEY`, `DATABASE_URL`) tidak ikut tercetak bila `Settings` di-log.
 
 | Variabel | Default | Keterangan |
 |---|---|---|
@@ -470,12 +472,24 @@ Semua lewat environment variable:
 | `MAX_WORKERS` | `4` | Jumlah request OCR paralel (di service: total untuk semua request masuk) |
 | `HOST` | `0.0.0.0` | Service: alamat listen |
 | `PORT` | `8090` | Service: port listen |
-| `SERVICE_API_KEY` | kosong | Service: nilai header `X-API-Key` yang wajib dikirim. Kosong = tanpa autentikasi. |
+| `SERVICE_API_KEY` | kosong | Service: nilai header `X-API-Key` yang wajib dikirim. Kosong = tanpa autentikasi (hanya untuk uji lokal; di Docker wajib). |
 | `MAX_TICKETS_PER_REQUEST` | `50` | Service: batas jumlah tiket di `POST /tickets/ocr` |
 | `FACE_BASE_URL` | `http://localhost:8000` | Face Verification Service (CompreFace). Di Docker default `http://host.docker.internal:8000`. |
 | `FACE_API_KEY` | kosong | API key service verification CompreFace (header `x-api-key`). Kosong = similarity tidak dihitung. |
 | `FACE_TIMEOUT` | `30` | Timeout request face verify (detik) |
-| `DATABASE_URL` | kosong | PostgreSQL penyimpan hasil, mis. `postgresql://user:pass@host:5432/db`. Kosong = tidak disimpan. Di Docker diisi otomatis dari `POSTGRES_PASSWORD`. |
+| `DATABASE_URL` | kosong | PostgreSQL penyimpan hasil, mis. `postgresql://user:pass@host:5432/db`. Kosong = tidak disimpan. Di Docker diisi otomatis dari `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`. |
+
+Khusus `docker-compose.yml`:
+
+| Variabel | Default | Keterangan |
+|---|---|---|
+| `SERVICE_API_KEY`, `OCR_API_KEY`, `POSTGRES_PASSWORD` | wajib | Compose menolak jalan bila kosong. |
+| `POSTGRES_USER` | `microsite` | User PostgreSQL (hanya berlaku saat volume `pgdata` dibuat) |
+| `POSTGRES_DB` | `microsite_ocr` | Nama database (hanya berlaku saat volume `pgdata` dibuat) |
+| `SERVICE_PORT` | `8090` | Port host untuk service |
+| `POSTGRES_PORT` | `5432` | Port PostgreSQL di `127.0.0.1` host |
+| `DOCKER_MTU` | `1400` | MTU network compose |
+| `TZ` | `Asia/Jakarta` | Zona waktu container |
 
 Contoh:
 
@@ -587,7 +601,7 @@ microsite_ocr/
 ├── static/         # Aset Swagger UI untuk /docs (offline)
 ├── __main__.py     # CLI OCR: parsing argumen, tulis JSON, exit code
 ├── download.py     # CLI download: TicketDownloader, simpan file per tiket
-├── config.py       # Settings dari env var
+├── config.py       # Settings dari env var (validasi + rahasia tidak ikut repr)
 ├── cli.py          # Bagian bersama kedua CLI: logging, argumen tiket, load_ticket_ids
 ├── documents.py    # DocumentType, classify_filename, DmsDocument, DownloadedFile, ProcessedDocument
 ├── images.py       # detect_image_type dari signature file

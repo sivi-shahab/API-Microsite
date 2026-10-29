@@ -1,6 +1,7 @@
 # Microsite OCR Service + PostgreSQL penyimpan hasil.
 #
-#   SERVICE_API_KEY=<kunci> POSTGRES_PASSWORD=<sandi> docker compose up -d --build
+#   cp .env.example .env && chmod 600 .env   # lalu isi nilai rahasia
+#   docker compose up -d --build
 #   curl localhost:8090/health
 #
 # OCR API (/data/ocr-qwen) dan DMS diakses lewat IP, jadi service ini tidak perlu
@@ -18,12 +19,17 @@ services:
       OCR_BASE_URL: ${OCR_BASE_URL:-http://10.168.105.11:8070}
       # Wajib: OCR API menolak /extract/* tanpa X-API-Key (401).
       OCR_API_KEY: ${OCR_API_KEY:?isi OCR_API_KEY di .env}
+      DMS_TIMEOUT: ${DMS_TIMEOUT:-30}
+      OCR_TIMEOUT: ${OCR_TIMEOUT:-120}
       MAX_WORKERS: ${MAX_WORKERS:-4}
-      SERVICE_API_KEY: ${SERVICE_API_KEY:-}
-      DATABASE_URL: postgresql://microsite:${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD di .env}@db:5432/microsite_ocr
+      MAX_TICKETS_PER_REQUEST: ${MAX_TICKETS_PER_REQUEST:-50}
+      # Wajib: response berisi data nasabah (NIK, nama, alamat), jadi service tidak boleh jalan tanpa autentikasi.
+      SERVICE_API_KEY: ${SERVICE_API_KEY:?isi SERVICE_API_KEY di .env}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-microsite}:${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD di .env}@db:5432/${POSTGRES_DB:-microsite_ocr}
       # Face Verification Service (CompreFace) di host ini; FACE_API_KEY kosong = similarity tidak dihitung.
       FACE_BASE_URL: ${FACE_BASE_URL:-http://host.docker.internal:8000}
       FACE_API_KEY: ${FACE_API_KEY:-}
+      FACE_TIMEOUT: ${FACE_TIMEOUT:-30}
       TZ: ${TZ:-Asia/Jakarta}
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -38,8 +44,8 @@ services:
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     environment:
-      POSTGRES_DB: microsite_ocr
-      POSTGRES_USER: microsite
+      POSTGRES_DB: ${POSTGRES_DB:-microsite_ocr}
+      POSTGRES_USER: ${POSTGRES_USER:-microsite}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD di .env}
       TZ: ${TZ:-Asia/Jakarta}
     volumes:
@@ -47,7 +53,7 @@ services:
       # Dijalankan sekali saat volume pgdata masih kosong.
       - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U microsite -d microsite_ocr"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5

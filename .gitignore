@@ -6,6 +6,8 @@ venv/
 
 # Secret / konfigurasi lokal
 .env
+.env.*
+!.env.example
 
 # Data nasabah: foto KTP/selfie, hasil OCR, daftar tiket
 downloads/
