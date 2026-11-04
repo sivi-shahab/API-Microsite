@@ -1,7 +1,7 @@
 -- Satu baris = satu dokumen (KTP/NPWP/SELFIE) dari satu hit API microsite_ocr.
 -- Dijalankan otomatis oleh image postgres saat volume data masih kosong.
 
-CREATE TABLE IF NOT EXISTS ocr_document (
+CREATE TABLE IF NOT EXISTS microsite_vtt_tms (
     id              uuid         PRIMARY KEY DEFAULT gen_random_uuid(),
     -- Waktu API di-hit; semua dokumen dari satu request memakai nilai yang sama.
     hit_at          timestamptz  NOT NULL DEFAULT now(),
@@ -17,18 +17,18 @@ CREATE TABLE IF NOT EXISTS ocr_document (
     -- Skor kemiripan wajah KTP vs SELFIE (0–1), diisi proses face matching.
     face_similarity numeric(5, 4),
 
-    CONSTRAINT ocr_document_file_type_check
+    CONSTRAINT microsite_vtt_tms_file_type_check
         CHECK (file_type IN ('selfie', 'ktp', 'npwp')),
-    CONSTRAINT ocr_document_selfie_no_ocr
+    CONSTRAINT microsite_vtt_tms_selfie_no_ocr
         CHECK (file_type <> 'selfie' OR ocr_result IS NULL),
-    CONSTRAINT ocr_document_npwp_no_similarity
+    CONSTRAINT microsite_vtt_tms_npwp_no_similarity
         CHECK (file_type <> 'npwp' OR face_similarity IS NULL),
-    CONSTRAINT ocr_document_similarity_range
+    CONSTRAINT microsite_vtt_tms_similarity_range
         CHECK (face_similarity BETWEEN 0 AND 1)
 );
 
-CREATE INDEX IF NOT EXISTS ocr_document_nomor_dokumen_idx ON ocr_document (nomor_dokumen);
-CREATE INDEX IF NOT EXISTS ocr_document_hit_at_idx ON ocr_document (hit_at);
+CREATE INDEX IF NOT EXISTS microsite_vtt_tms_nomor_dokumen_idx ON microsite_vtt_tms (nomor_dokumen);
+CREATE INDEX IF NOT EXISTS microsite_vtt_tms_hit_at_idx ON microsite_vtt_tms (hit_at);
 
 -- Similarity berlaku per nomor dokumen: KTP dan SELFIE dengan nomor dokumen yang sama
 -- selalu diberi skor yang sama, NPWP tetap NULL. Kembalikan jumlah baris yang diubah.
@@ -37,7 +37,7 @@ RETURNS integer
 LANGUAGE sql
 AS $$
     WITH updated AS (
-        UPDATE ocr_document
+        UPDATE microsite_vtt_tms
            SET face_similarity = p_score
          WHERE nomor_dokumen = p_nomor_dokumen
            AND file_type IN ('ktp', 'selfie')

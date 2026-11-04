@@ -312,7 +312,7 @@ docker compose logs -f api
 
 ## Database
 
-Container `db` (`postgres:16-alpine`, database `microsite_ocr`, user `microsite`) menyimpan setiap dokumen dari setiap hit endpoint OCR ke tabel `ocr_document`. Schema ada di `db/init/01_ocr_document.sql` dan dijalankan otomatis **hanya saat volume `pgdata` masih kosong**; perubahan schema berikutnya harus dijalankan manual dengan `psql`.
+Container `db` (`postgres:16-alpine`, database `microsite_ocr`, user `microsite`) menyimpan setiap dokumen dari setiap hit endpoint OCR ke tabel `microsite_vtt_tms`. Schema ada di `db/init/01_microsite_vtt_tms.sql` dan dijalankan otomatis **hanya saat volume `pgdata` masih kosong**; perubahan schema berikutnya harus dijalankan manual dengan `psql`.
 
 | Kolom | Tipe | Isi |
 |---|---|---|
@@ -353,10 +353,10 @@ psql "postgresql://microsite:$(grep POSTGRES_PASSWORD .env | cut -d= -f2-)@127.0
 ```sql
 -- Ringkasan hit terakhir, tanpa kolom base64 yang besar
 SELECT hit_at, nomor_dokumen, file_type, node_id, ocr_result->'data'->>'NIK' AS nik, face_similarity
-FROM ocr_document ORDER BY hit_at DESC LIMIT 20;
+FROM microsite_vtt_tms ORDER BY hit_at DESC LIMIT 20;
 
 -- Simpan kembali foto dari base64
-psql ... -Atc "SELECT file_base64 FROM ocr_document WHERE id = '<uuid>'" | base64 -d > foto.jpg
+psql ... -Atc "SELECT file_base64 FROM microsite_vtt_tms WHERE id = '<uuid>'" | base64 -d > foto.jpg
 ```
 
 CLI juga menyimpan ke database bila `DATABASE_URL` diisi; tanpa `DATABASE_URL` tidak ada yang disimpan.
@@ -610,13 +610,13 @@ microsite_ocr/
 ├── quality.py      # check_quality: penanda field kosong & NIK tidak cocok
 ├── face_client.py  # FaceClient.verify: HTTP ke CompreFace, similarity SELFIE vs KTP
 ├── face_matching.py     # FaceMatcher, group_faces: aturan skor per nomor dokumen (pasangan, skor tertinggi)
-├── store.py        # OcrStore: semua SQL tabel ocr_document (simpan hit, set skor, query backfill)
+├── store.py        # OcrStore: semua SQL tabel microsite_vtt_tms (simpan hit, set skor, query backfill)
 ├── recorder.py     # HitRecorder: dokumen satu hit → face matching → store
 ├── backfill_similarity.py  # CLI backfill: skor untuk data lama, pakai face_matching + store
 └── pipeline.py     # TicketOcrPipeline: search → download → OCR → cek kualitas → serahkan ke DocumentRecorder
 ```
 
-File deploy di root: `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `db/init/01_ocr_document.sql` (schema database). Collection Postman/Insomnia: `microsite_ocr.postman_collection.json`.
+File deploy di root: `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `db/init/01_microsite_vtt_tms.sql` (schema database). Collection Postman/Insomnia: `microsite_ocr.postman_collection.json`.
 
 ```mermaid
 flowchart TD

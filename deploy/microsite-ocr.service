@@ -1,0 +1,18 @@
+[Unit]
+Description=Microsite OCR Service (KTP/NPWP dari DMS-Cardsys)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=sys-adm
+Group=sys-adm
+WorkingDirectory=/data/API-Microsite
+# Semua konfigurasi (DATABASE_URL, SERVICE_API_KEY, OCR_API_KEY, ...) dari .env.
+EnvironmentFile=/data/API-Microsite/.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/data/API-Microsite/venv/bin/python -m microsite_ocr.service
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

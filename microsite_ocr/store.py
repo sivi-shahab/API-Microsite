@@ -1,4 +1,4 @@
-"""Akses PostgreSQL untuk tabel `ocr_document` (schema di db/init/). Semua SQL ada di sini."""
+"""Akses PostgreSQL untuk tabel `microsite_vtt_tms` (schema di db/init/). Semua SQL ada di sini."""
 import base64
 import logging
 from collections.abc import Collection
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 DMS_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 _INSERT = """
-    INSERT INTO ocr_document (hit_at, nomor_dokumen, create_date, file_type, node_id, file_base64, ocr_result)
+    INSERT INTO microsite_vtt_tms (hit_at, nomor_dokumen, create_date, file_type, node_id, file_base64, ocr_result)
     VALUES (%s, %s, %s, %s, %s, %s, %s)
 """
 
@@ -26,7 +26,7 @@ _SET_SIMILARITY = "SELECT set_face_similarity(%s::varchar, %s::numeric)"
 # Nomor dokumen yang punya foto KTP dan SELFIE; tanpa `rescore` hanya yang masih ada skor NULL.
 _PENDING_TICKETS = """
     SELECT nomor_dokumen
-      FROM ocr_document
+      FROM microsite_vtt_tms
      WHERE file_type IN ('ktp', 'selfie')
        AND (%(ticket_ids)s::text[] IS NULL OR nomor_dokumen = ANY(%(ticket_ids)s))
      GROUP BY nomor_dokumen
@@ -40,7 +40,7 @@ _PENDING_TICKETS = """
 # Satu foto per node_id (hit terbaru); node yang sama di beberapa hit isinya sama.
 _FACE_IMAGES = """
     SELECT DISTINCT ON (nomor_dokumen, node_id) nomor_dokumen, file_type, file_base64
-      FROM ocr_document
+      FROM microsite_vtt_tms
      WHERE nomor_dokumen = ANY(%s)
        AND file_type IN ('ktp', 'selfie')
        AND file_base64 IS NOT NULL
@@ -49,20 +49,25 @@ _FACE_IMAGES = """
 
 
 class OcrStore:
-    def __init__(self, database_url: str):
+    def __init__(self, database_url: str, schema: str = ""):
         self._database_url = database_url
+        # search_path diset per koneksi supaya semua SQL di sini memakai schema ini.
+        self._options = f"-c search_path={schema}" if schema else None
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "OcrStore | None":
         """None bila `DATABASE_URL` kosong (penyimpanan dimatikan)."""
-        return cls(settings.database_url) if settings.database_url else None
+        return cls(settings.database_url, settings.db_schema) if settings.database_url else None
+
+    def _connect(self) -> psycopg.Connection:
+        return psycopg.connect(self._database_url, options=self._options) if self._options else psycopg.connect(self._database_url)
 
     def save(self, hit_at: datetime, documents: list[ProcessedDocument], similarities: dict[str, float]) -> None:
         """Simpan dokumen satu hit, lalu terapkan skor similarity per nomor dokumen (satu transaksi)."""
         rows = [_to_row(hit_at, item) for item in documents if item.document.type is not DocumentType.UNKNOWN]
         if not rows:
             return
-        with psycopg.connect(self._database_url) as conn, conn.cursor() as cur:
+        with self._connect() as conn, conn.cursor() as cur:
             cur.executemany(_INSERT, rows)
             _apply_similarities(cur, similarities)
         logger.info("%d dokumen disimpan ke database", len(rows))
@@ -70,7 +75,7 @@ class OcrStore:
     def set_similarities(self, similarities: dict[str, float]) -> None:
         if not similarities:
             return
-        with psycopg.connect(self._database_url) as conn, conn.cursor() as cur:
+        with self._connect() as conn, conn.cursor() as cur:
             _apply_similarities(cur, similarities)
 
     def pending_tickets(
@@ -78,12 +83,12 @@ class OcrStore:
     ) -> list[str]:
         """Nomor dokumen yang bisa dihitung similarity-nya, urut dari hit paling lama."""
         params = {"ticket_ids": list(ticket_ids) if ticket_ids else None, "rescore": rescore, "limit": limit}
-        with psycopg.connect(self._database_url) as conn:
+        with self._connect() as conn:
             return [ticket_id for (ticket_id,) in conn.execute(_PENDING_TICKETS, params)]
 
     def face_images(self, ticket_ids: Collection[str]) -> list[tuple[str, DocumentType, bytes]]:
         """Foto KTP & SELFIE nomor dokumen ini sebagai (nomor dokumen, jenis, isi file)."""
-        with psycopg.connect(self._database_url) as conn:
+        with self._connect() as conn:
             rows = conn.execute(_FACE_IMAGES, (list(ticket_ids),)).fetchall()
         return [(ticket_id, DocumentType(file_type), base64.b64decode(content)) for ticket_id, file_type, content in rows]
 

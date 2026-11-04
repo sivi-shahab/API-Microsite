@@ -1,4 +1,4 @@
-"""Isi `face_similarity` untuk data lama di tabel `ocr_document`, dari foto base64 yang sudah tersimpan.
+"""Isi `face_similarity` untuk data lama di tabel `microsite_vtt_tms`, dari foto base64 yang sudah tersimpan.
 
 Tidak memanggil DMS maupun OCR. Aturan skor sama dengan saat hit API (lihat `face_matching.py`).
 

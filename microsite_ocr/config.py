@@ -1,4 +1,5 @@
 import os
+import re
 from dataclasses import dataclass, field
 
 
@@ -14,6 +15,18 @@ def _env_url(name: str, default: str) -> str:
     value = _env_str(name, default).rstrip("/")
     if not value.startswith(("http://", "https://")):
         raise ConfigError(f"{name} harus diawali http:// atau https://, diterima {value!r}")
+    return value
+
+
+def _env_database_url(name: str, default: str) -> str:
+    # Terima juga URL gaya SQLAlchemy (postgresql+psycopg2://...); psycopg hanya kenal postgresql://.
+    return re.sub(r"^postgres(?:ql)?\+\w+://", "postgresql://", _env_str(name, default))
+
+
+def _env_schema(name: str, default: str) -> str:
+    value = _env_str(name, default)
+    if value and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", value):
+        raise ConfigError(f"{name} harus nama schema sederhana (huruf, angka, _), diterima {value!r}")
     return value
 
 
@@ -47,6 +60,8 @@ class Settings:
     max_tickets_per_request: int = 50
     # PostgreSQL untuk menyimpan setiap dokumen yang diproses. Kosong = tidak disimpan.
     database_url: str = field(default="", repr=False)
+    # Schema PostgreSQL tempat tabel microsite_vtt_tms (search_path). Kosong = default server (public).
+    db_schema: str = ""
     # Face Verification Service (CompreFace) untuk similarity KTP vs SELFIE. API key kosong = tidak dihitung.
     face_base_url: str = "http://localhost:8000"
     face_api_key: str = field(default="", repr=False)
@@ -66,7 +81,8 @@ class Settings:
             port=_env_number("PORT", defaults.port, int, 1),
             api_key=_env_str("SERVICE_API_KEY", defaults.api_key),
             max_tickets_per_request=_env_number("MAX_TICKETS_PER_REQUEST", defaults.max_tickets_per_request, int, 1),
-            database_url=_env_str("DATABASE_URL", defaults.database_url),
+            database_url=_env_database_url("DATABASE_URL", defaults.database_url),
+            db_schema=_env_schema("DB_SCHEMA", defaults.db_schema),
             face_base_url=_env_url("FACE_BASE_URL", defaults.face_base_url),
             face_api_key=_env_str("FACE_API_KEY", defaults.face_api_key),
             face_timeout_seconds=_env_number("FACE_TIMEOUT", defaults.face_timeout_seconds, float, 1),
